@@ -38,46 +38,63 @@ class JEPXIngester:
     def fetch_yearly_prices(self, year: int) -> Optional[pd.DataFrame]:
         """
         Fetch yearly spot prices from JEPX CSV
-        JEPX publishes annual CSV files at jepx.org (not jepx.jp)
-        Files include spot_YEAR.csv (raw data) and spot_summary_YEAR.csv (summary)
-        """
-        # Try multiple URL patterns
-        urls = [
-            f"http://www.jepx.org/market/excel/spot_summary_{year}.csv",  # Summary with prices
-            f"http://www.jepx.org/market/excel/spot_{year}.csv",  # Raw data
-            f"https://www.jepx.jp/market/excel/spot_summary_{year}.csv",  # New site
-        ]
 
+        JEPX uses a POST-based download mechanism via /_download.php
+        The download button on the website sends a POST request with form data:
+        - dir=spot_summary (or spot for raw data)
+        - file=spot_summary_YYYY.csv
+
+        Encoding: Shift_JIS (cp932)
+        """
         logger.info(f"Attempting to fetch JEPX data for {year}")
 
-        # Use realistic browser headers to avoid being blocked
+        # JEPX download endpoint
+        download_url = "https://www.jepx.jp/_download.php"
+
+        # Try different file patterns
+        file_patterns = [
+            ("spot_summary", f"spot_summary_{year}.csv"),  # Summary with prices
+            ("spot", f"spot_{year}.csv"),  # Raw data
+        ]
+
+        # Browser-like headers required by JEPX
         headers = {
             'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
-            'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8',
+            'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,*/*;q=0.8',
             'Accept-Language': 'ja-JP,ja;q=0.9,en-US;q=0.8,en;q=0.7',
-            'Accept-Encoding': 'gzip, deflate',
+            'Accept-Encoding': 'gzip, deflate, br',
+            'Content-Type': 'application/x-www-form-urlencoded',
+            'Origin': 'https://www.jepx.jp',
+            'Referer': 'https://www.jepx.jp/electricpower/market-data/spot/',
             'Connection': 'keep-alive',
-            'Upgrade-Insecure-Requests': '1',
-            'Referer': 'http://www.jepx.org/',
             'Cache-Control': 'max-age=0'
         }
 
         with httpx.Client(timeout=30.0, follow_redirects=True) as client:
-            # Try each URL pattern
-            for url in urls:
+            # Try each file pattern
+            for dir_name, file_name in file_patterns:
                 try:
-                    logger.info(f"Trying URL: {url}")
-                    response = client.get(url, headers=headers)
+                    # Form data for POST request
+                    form_data = {
+                        'dir': dir_name,
+                        'file': file_name
+                    }
 
-                    if response.status_code == 200:
-                        logger.info(f"Successfully fetched from: {url}")
+                    logger.info(f"Trying POST to /_download.php: dir={dir_name}, file={file_name}")
+                    response = client.post(download_url, data=form_data, headers=headers)
 
-                        # JEPX uses SHIFT_JIS encoding, try UTF-8 as fallback
+                    if response.status_code == 200 and len(response.content) > 0:
+                        logger.info(f"Successfully fetched {file_name} ({len(response.content)} bytes)")
+
+                        # JEPX uses SHIFT_JIS (cp932) encoding
                         try:
-                            content = response.content.decode('shift_jis')
+                            content = response.content.decode('cp932')
                         except UnicodeDecodeError:
-                            logger.warning("Failed to decode as shift_jis, trying utf-8")
-                            content = response.content.decode('utf-8')
+                            try:
+                                content = response.content.decode('shift_jis')
+                            except UnicodeDecodeError:
+                                logger.warning("Failed to decode as cp932/shift_jis, trying utf-8")
+                                content = response.content.decode('utf-8')
 
                         # Parse CSV
                         from io import StringIO
@@ -88,15 +105,15 @@ class JEPXIngester:
                         return df
 
                     else:
-                        logger.warning(f"URL returned {response.status_code}: {url}")
+                        logger.warning(f"POST returned {response.status_code} or empty content for {file_name}")
 
                 except Exception as e:
-                    logger.warning(f"Failed to fetch from {url}: {e}")
+                    logger.warning(f"Failed to fetch {file_name}: {e}")
                     continue
 
-            # If all URLs failed, try previous year as fallback
+            # If all patterns failed for 2025, try previous year as fallback
             if year >= 2025:
-                logger.warning(f"All URLs failed for {year}, trying {year-1}")
+                logger.warning(f"All file patterns failed for {year}, trying {year-1}")
                 return self.fetch_yearly_prices(year - 1)
 
             logger.error(f"Could not fetch JEPX data for {year} from any source")
@@ -167,14 +184,18 @@ class JEPXIngester:
             date_col = '年月日' if '年月日' in raw_df.columns else 'Date'
             date_str = row[date_col]
 
-            # Parse slot/hour (コマ or Slot)
-            slot_col = 'コマ' if 'コマ' in raw_df.columns else 'Slot'
+            # Parse slot/hour (時刻コード or Slot)
+            # JEPX uses 48 time codes (1-48) for 30-minute intervals:
+            # Code 1  = 00:00-00:30 (timestamp 00:00)
+            # Code 2  = 00:30-01:00 (timestamp 00:30)
+            # Code 3  = 01:00-01:30 (timestamp 01:00)
+            # ...
+            # Code 48 = 23:30-24:00 (timestamp 23:30)
+            slot_col = '時刻コード' if '時刻コード' in raw_df.columns else ('コマ' if 'コマ' in raw_df.columns else 'Slot')
             if slot_col in row:
-                # Slot is usually 1-48 for 30-minute intervals
-                # Convert to hour (slot 1 = 00:30, slot 2 = 01:00, etc.)
                 slot = int(row[slot_col])
                 hour = (slot - 1) // 2
-                minute = 0 if slot % 2 == 0 else 30
+                minute = 30 if (slot % 2 == 0) else 0
             else:
                 hour = 0
                 minute = 0
