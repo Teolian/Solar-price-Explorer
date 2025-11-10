@@ -1,5 +1,6 @@
 import type { Metadata } from 'next'
 import { Inter } from 'next/font/google'
+import Link from 'next/link'
 import './globals.css'
 
 const inter = Inter({ subsets: ['latin'] })
@@ -20,11 +21,51 @@ export default function RootLayout({
         <div className="min-h-screen bg-background">
           <header className="border-b">
             <div className="container mx-auto px-4 py-4">
-              <h1 className="text-2xl font-bold">Solar×Price Explorer</h1>
+              <Link href="/">
+                <h1 className="text-2xl font-bold cursor-pointer hover:text-primary">
+                  Solar×Price Explorer
+                </h1>
+              </Link>
               <p className="text-sm text-muted-foreground">
                 JEPX Price Analysis with JMA Solar Radiation
               </p>
             </div>
+            <nav className="container mx-auto px-4 py-2">
+              <ul className="flex space-x-6 text-sm">
+                <li>
+                  <Link
+                    href="/"
+                    className="hover:text-primary transition-colors"
+                  >
+                    Overview
+                  </Link>
+                </li>
+                <li>
+                  <Link
+                    href="/correlations"
+                    className="hover:text-primary transition-colors"
+                  >
+                    Correlations
+                  </Link>
+                </li>
+                <li>
+                  <Link
+                    href="/forecast"
+                    className="hover:text-primary transition-colors"
+                  >
+                    Forecast
+                  </Link>
+                </li>
+                <li>
+                  <Link
+                    href="/data"
+                    className="hover:text-primary transition-colors"
+                  >
+                    Data Explorer
+                  </Link>
+                </li>
+              </ul>
+            </nav>
           </header>
           <main className="container mx-auto px-4 py-6">
             {children}
