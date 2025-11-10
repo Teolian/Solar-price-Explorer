@@ -38,49 +38,68 @@ class JEPXIngester:
     def fetch_yearly_prices(self, year: int) -> Optional[pd.DataFrame]:
         """
         Fetch yearly spot prices from JEPX CSV
-        JEPX publishes annual summary CSV files with prices
-        If requested year not available, tries previous year
+        JEPX publishes annual CSV files at jepx.org (not jepx.jp)
+        Files include spot_YEAR.csv (raw data) and spot_summary_YEAR.csv (summary)
         """
-        url = f"https://www.jepx.jp/market/excel/spot_summary_{year}.csv"
-        logger.info(f"Fetching JEPX data from {url}")
+        # Try multiple URL patterns
+        urls = [
+            f"http://www.jepx.org/market/excel/spot_summary_{year}.csv",  # Summary with prices
+            f"http://www.jepx.org/market/excel/spot_{year}.csv",  # Raw data
+            f"https://www.jepx.jp/market/excel/spot_summary_{year}.csv",  # New site
+        ]
 
-        try:
-            # Use browser-like headers to avoid blocking
-            headers = {
-                'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
-                'Accept': 'text/csv,application/csv,text/plain,*/*',
-                'Accept-Language': 'ja,en-US;q=0.9,en;q=0.8',
-                'Referer': 'https://www.jepx.jp/'
-            }
+        logger.info(f"Attempting to fetch JEPX data for {year}")
 
-            with httpx.Client(timeout=30.0, follow_redirects=True) as client:
-                response = client.get(url, headers=headers)
+        # Use realistic browser headers to avoid being blocked
+        headers = {
+            'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+            'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8',
+            'Accept-Language': 'ja-JP,ja;q=0.9,en-US;q=0.8,en;q=0.7',
+            'Accept-Encoding': 'gzip, deflate',
+            'Connection': 'keep-alive',
+            'Upgrade-Insecure-Requests': '1',
+            'Referer': 'http://www.jepx.org/',
+            'Cache-Control': 'max-age=0'
+        }
 
-                # If 404 and current year, try previous year
-                if response.status_code == 404 and year >= 2024:
-                    logger.warning(f"File for {year} not found, trying {year-1}")
-                    url = f"https://www.jepx.jp/market/excel/spot_summary_{year-1}.csv"
+        with httpx.Client(timeout=30.0, follow_redirects=True) as client:
+            # Try each URL pattern
+            for url in urls:
+                try:
+                    logger.info(f"Trying URL: {url}")
                     response = client.get(url, headers=headers)
 
-                response.raise_for_status()
+                    if response.status_code == 200:
+                        logger.info(f"Successfully fetched from: {url}")
 
-                # JEPX uses SHIFT_JIS encoding, try UTF-8 as fallback
-                try:
-                    content = response.content.decode('shift_jis')
-                except UnicodeDecodeError:
-                    logger.warning("Failed to decode as shift_jis, trying utf-8")
-                    content = response.content.decode('utf-8')
+                        # JEPX uses SHIFT_JIS encoding, try UTF-8 as fallback
+                        try:
+                            content = response.content.decode('shift_jis')
+                        except UnicodeDecodeError:
+                            logger.warning("Failed to decode as shift_jis, trying utf-8")
+                            content = response.content.decode('utf-8')
 
-                # Parse CSV
-                from io import StringIO
-                df = pd.read_csv(StringIO(content))
+                        # Parse CSV
+                        from io import StringIO
+                        df = pd.read_csv(StringIO(content))
 
-                logger.info(f"Fetched {len(df)} records for {year}")
-                logger.info(f"Columns: {list(df.columns)[:5]}...")  # Log first few columns
-                return df
+                        logger.info(f"Fetched {len(df)} records for {year}")
+                        logger.info(f"Columns: {list(df.columns)[:10]}")  # Log first 10 columns
+                        return df
 
-        except Exception as e:
-            logger.error(f"Error fetching JEPX data for {year}: {e}")
+                    else:
+                        logger.warning(f"URL returned {response.status_code}: {url}")
+
+                except Exception as e:
+                    logger.warning(f"Failed to fetch from {url}: {e}")
+                    continue
+
+            # If all URLs failed, try previous year as fallback
+            if year >= 2025:
+                logger.warning(f"All URLs failed for {year}, trying {year-1}")
+                return self.fetch_yearly_prices(year - 1)
+
+            logger.error(f"Could not fetch JEPX data for {year} from any source")
             return None
 
     def fetch_daily_prices(self, date: datetime) -> Optional[pd.DataFrame]:
