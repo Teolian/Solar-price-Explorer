@@ -1,18 +1,21 @@
-.PHONY: help setup start stop clean test lint logs test-data db-clean
+.PHONY: help setup start stop clean test lint logs test-data db-clean fetch-real-data fetch-jepx fetch-radiation
 
 help:
 	@echo "Solar×Price Explorer - Development Commands"
 	@echo ""
-	@echo "make setup     - Setup development environment"
-	@echo "make start     - Start all services with Docker Compose"
-	@echo "make stop      - Stop all services"
-	@echo "make clean     - Clean all containers and volumes"
-	@echo "make logs      - View logs from all services"
-	@echo "make db-init   - Initialize database schema"
-	@echo "make db-clean  - Clear all data from tables"
-	@echo "make test-data - Generate mock test data"
-	@echo "make test      - Run all tests"
-	@echo "make lint      - Run linters"
+	@echo "make setup          - Setup development environment"
+	@echo "make start          - Start all services with Docker Compose"
+	@echo "make stop           - Stop all services"
+	@echo "make clean          - Clean all containers and volumes"
+	@echo "make logs           - View logs from all services"
+	@echo "make db-init        - Initialize database schema"
+	@echo "make db-clean       - Clear all data from tables"
+	@echo "make test-data      - Generate mock test data"
+	@echo "make fetch-real-data - Fetch real JEPX and radiation data (last 7 days)"
+	@echo "make fetch-jepx     - Fetch real JEPX price data only"
+	@echo "make fetch-radiation - Fetch real solar radiation data only"
+	@echo "make test           - Run all tests"
+	@echo "make lint           - Run linters"
 
 setup:
 	@echo "Setting up development environment..."
@@ -76,3 +79,20 @@ db-clean:
 etl:
 	@echo "Running ETL pipeline..."
 	./scripts/run_etl.sh TOKYO,TOHOKU 7
+
+fetch-jepx:
+	@echo "Fetching real JEPX price data..."
+	docker-compose exec -T api python /etl/jepx_ingest.py --areas TOKYO,TOHOKU,HOKKAIDO --days 7
+	@echo "JEPX data fetched!"
+
+fetch-radiation:
+	@echo "Fetching real solar radiation data..."
+	docker-compose exec -T api python /etl/jma_ingest.py --areas TOKYO,TOHOKU,HOKKAIDO --days 7
+	@echo "Radiation data fetched!"
+
+fetch-real-data:
+	@echo "Fetching real data from JEPX and Open-Meteo..."
+	docker-compose exec -T api python /etl/jepx_ingest.py --areas TOKYO,TOHOKU,HOKKAIDO --days 7
+	docker-compose exec -T api python /etl/jma_ingest.py --areas TOKYO,TOHOKU,HOKKAIDO --days 7
+	docker-compose exec -T api python /etl/build_features.py --areas TOKYO,TOHOKU,HOKKAIDO --days 7
+	@echo "Real data fetched and features built!"
