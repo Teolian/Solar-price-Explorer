@@ -194,7 +194,7 @@ class FeatureBuilder:
                     features = self.build_features(raw_data, area)
 
                     # Filter to requested date range
-                    features = features[features['timestamp'] >= start_date]
+                    features = features[features['timestamp'] >= pd.Timestamp(start_date)]
 
                     self.store_features(features)
                 else:
