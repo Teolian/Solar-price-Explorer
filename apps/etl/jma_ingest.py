@@ -24,30 +24,21 @@ logger = logging.getLogger(__name__)
 
 # Constants
 JST = pytz.timezone('Asia/Tokyo')
-JMA_BASE_URL = "https://www.data.jma.go.jp/env/radiation/en/data_rad_e.html"
 
-# Station to JEPX area mapping
-STATION_AREA_MAP = {
-    "ABASHIRI": "HOKKAIDO",
-    "TSUKUBA": "TOKYO",  # Also used as proxy for TOHOKU, CHUBU, etc.
-    "TATENO": "TOKYO",   # Alternative name for Tsukuba
-    "ISHIGAKIJIMA": "KYUSHU",
-    "MINAMITORISHIMA": None,  # Remote island, not mapped to JEPX area
-    "SAPPORO": "HOKKAIDO",  # Historical data only (until 2020-11)
-    "FUKUOKA": "KYUSHU",    # Historical data only (until 2024-03)
-}
+# Using Open-Meteo Satellite Radiation API for Japan (Himawari satellite)
+OPEN_METEO_BASE = "https://archive-api.open-meteo.com/v1/archive"
 
-# Proxy mapping for areas without direct stations
-AREA_PROXY_MAP = {
-    "HOKKAIDO": "ABASHIRI",
-    "TOHOKU": "TSUKUBA",
-    "TOKYO": "TSUKUBA",
-    "CHUBU": "TSUKUBA",
-    "HOKURIKU": "TSUKUBA",
-    "KANSAI": "TSUKUBA",
-    "CHUGOKU": "TSUKUBA",
-    "SHIKOKU": "TSUKUBA",
-    "KYUSHU": "TSUKUBA",  # FUKUOKA until 2024-03, then TSUKUBA
+# Representative coordinates for each JEPX area
+AREA_COORDINATES = {
+    "HOKKAIDO": {"lat": 43.06, "lon": 141.35, "name": "Sapporo"},      # Sapporo
+    "TOHOKU": {"lat": 38.27, "lon": 140.87, "name": "Sendai"},         # Sendai
+    "TOKYO": {"lat": 35.68, "lon": 139.65, "name": "Tokyo"},           # Tokyo
+    "CHUBU": {"lat": 35.18, "lon": 136.91, "name": "Nagoya"},          # Nagoya
+    "HOKURIKU": {"lat": 36.59, "lon": 136.63, "name": "Kanazawa"},     # Kanazawa
+    "KANSAI": {"lat": 34.69, "lon": 135.50, "name": "Osaka"},          # Osaka
+    "CHUGOKU": {"lat": 34.39, "lon": 132.46, "name": "Hiroshima"},     # Hiroshima
+    "SHIKOKU": {"lat": 33.84, "lon": 132.77, "name": "Matsuyama"},     # Matsuyama
+    "KYUSHU": {"lat": 33.59, "lon": 130.40, "name": "Fukuoka"}         # Fukuoka
 }
 
 class JMAIngester:
@@ -56,71 +47,124 @@ class JMAIngester:
         self.engine = create_engine(database_url)
         self.Session = sessionmaker(bind=self.engine)
 
-    def fetch_station_data(self, station: str, year: int, month: int) -> Optional[pd.DataFrame]:
+    def fetch_area_data(self, area: str, start_date: datetime, end_date: datetime) -> Optional[pd.DataFrame]:
         """
-        Fetch radiation data for a specific station and month
-        Note: This is a placeholder implementation
-        Actual implementation needs to parse JMA's text format
+        Fetch radiation data for a specific area using Open-Meteo Satellite API
+        Uses Himawari satellite data for Japan
         """
-        logger.info(f"Fetching JMA data for {station} - {year}-{month:02d}")
+        if area not in AREA_COORDINATES:
+            logger.warning(f"Area {area} not found in coordinates map")
+            return None
 
-        # TODO: Implement actual JMA data fetching
-        # JMA provides text files with specific format
-        # Need to:
-        # 1. Construct URL for the station/year/month
-        # 2. Download text file
-        # 3. Parse fixed-width or delimited format
-        # 4. Extract GHI, DNI, DHI columns
-        # 5. Handle quality flags
+        coords = AREA_COORDINATES[area]
+        logger.info(f"Fetching radiation data for {area} ({coords['name']}) from {start_date.date()} to {end_date.date()}")
 
-        logger.warning("JMA fetching not fully implemented - using placeholder")
-        return None
+        try:
+            # Format dates for API (UTC timezone)
+            start_str = start_date.strftime('%Y-%m-%d')
+            end_str = end_date.strftime('%Y-%m-%d')
 
-    def parse_jma_format(self, text_data: str, station: str) -> pd.DataFrame:
+            # Build API request
+            params = {
+                'latitude': coords['lat'],
+                'longitude': coords['lon'],
+                'start_date': start_str,
+                'end_date': end_str,
+                'hourly': 'shortwave_radiation,direct_radiation,diffuse_radiation',
+                'timezone': 'Asia/Tokyo'
+            }
+
+            with httpx.Client(timeout=60.0) as client:
+                response = client.get(OPEN_METEO_BASE, params=params)
+                response.raise_for_status()
+                data = response.json()
+
+            # Parse response
+            if 'hourly' not in data:
+                logger.warning(f"No hourly data in response for {area}")
+                return None
+
+            hourly = data['hourly']
+            df = pd.DataFrame({
+                'timestamp': pd.to_datetime(hourly['time']),
+                'ghi': hourly.get('shortwave_radiation', []),
+                'dni': hourly.get('direct_radiation', []),
+                'dhi': hourly.get('diffuse_radiation', []),
+            })
+
+            logger.info(f"Fetched {len(df)} hourly records for {area}")
+            return df
+
+        except Exception as e:
+            logger.error(f"Error fetching data for {area}: {e}")
+            return None
+
+    def normalize_data(self, raw_df: pd.DataFrame, area: str) -> pd.DataFrame:
         """
-        Parse JMA radiation data format
-        Format varies between "until Mar 2024" and "since Apr 2024"
-        """
-        # TODO: Implement format parsing
-        # Handle both old and new formats
-        # Extract: datetime, GHI, DNI, DHI, quality flags
-
-        return pd.DataFrame()
-
-    def normalize_data(self, raw_df: pd.DataFrame, station: str) -> pd.DataFrame:
-        """
-        Normalize JMA data to standard format
+        Normalize radiation data to standard format
         """
         if raw_df is None or raw_df.empty:
             return pd.DataFrame()
 
         normalized = raw_df.copy()
 
-        # Add station and mapped area
-        normalized['station'] = station.upper()
-        normalized['area'] = STATION_AREA_MAP.get(station.upper())
+        # Add area and station metadata
+        coords = AREA_COORDINATES.get(area, {})
+        normalized['area'] = area
+        normalized['station'] = coords.get('name', area)
 
-        # Ensure timezone
-        normalized['timestamp'] = pd.to_datetime(normalized['timestamp']).dt.tz_localize(JST)
+        # Ensure timezone awareness
+        if normalized['timestamp'].dt.tz is None:
+            normalized['timestamp'] = normalized['timestamp'].dt.tz_localize(JST)
 
-        # Handle missing values
+        # Handle missing values and convert to float
         for col in ['ghi', 'dni', 'dhi']:
             if col in normalized.columns:
                 normalized[col] = pd.to_numeric(normalized[col], errors='coerce')
+                # Replace null values with None
+                normalized[col] = normalized[col].where(pd.notna(normalized[col]), None)
 
         return normalized
 
     def store_data(self, df: pd.DataFrame):
         """
-        Store normalized data in database
+        Store normalized data in database using upsert to handle duplicates
         """
         if df.empty:
             logger.warning("No data to store")
             return
 
         try:
-            df.to_sql('radiation', self.engine, if_exists='append', index=False)
-            logger.info(f"Stored {len(df)} radiation records")
+            from sqlalchemy import text
+
+            # Use INSERT ... ON CONFLICT DO UPDATE to handle duplicates
+            with self.engine.connect() as conn:
+                for _, row in df.iterrows():
+                    query = text("""
+                        INSERT INTO radiation (
+                            timestamp, station, area, ghi, dni, dhi
+                        ) VALUES (
+                            :timestamp, :station, :area, :ghi, :dni, :dhi
+                        )
+                        ON CONFLICT (timestamp, station, area)
+                        DO UPDATE SET
+                            ghi = EXCLUDED.ghi,
+                            dni = EXCLUDED.dni,
+                            dhi = EXCLUDED.dhi
+                    """)
+
+                    conn.execute(query, {
+                        'timestamp': row['timestamp'],
+                        'station': row['station'],
+                        'area': row['area'],
+                        'ghi': row['ghi'],
+                        'dni': row['dni'],
+                        'dhi': row['dhi']
+                    })
+
+                conn.commit()
+                logger.info(f"Stored/updated {len(df)} radiation records")
+
         except Exception as e:
             logger.error(f"Error storing data: {e}")
             raise
@@ -128,45 +172,29 @@ class JMAIngester:
     def run(self, areas: List[str], start_date: datetime, end_date: datetime):
         """
         Run ingestion for specified areas and date range
+        Fetches satellite radiation data from Open-Meteo for each area
         """
-        logger.info(f"Starting JMA ingestion for areas: {areas}")
+        logger.info(f"Starting radiation data ingestion for areas: {areas}")
         logger.info(f"Date range: {start_date.strftime('%Y-%m-%d')} to {end_date.strftime('%Y-%m-%d')}")
 
-        # Determine stations needed
-        stations = set()
         for area in areas:
-            station = AREA_PROXY_MAP.get(area.upper())
-            if station:
-                stations.add(station)
+            try:
+                # Fetch data for this area
+                raw_data = self.fetch_area_data(area, start_date, end_date)
 
-        logger.info(f"Fetching data from stations: {stations}")
-
-        # Fetch data for each station
-        for station in stations:
-            current_date = start_date
-            while current_date <= end_date:
-                try:
-                    year = current_date.year
-                    month = current_date.month
-
-                    raw_data = self.fetch_station_data(station, year, month)
-                    if raw_data is not None:
-                        normalized_data = self.normalize_data(raw_data, station)
-                        # Filter to requested date range
-                        mask = (normalized_data['timestamp'] >= start_date) & \
-                               (normalized_data['timestamp'] <= end_date)
-                        filtered_data = normalized_data[mask]
-                        self.store_data(filtered_data)
-                except Exception as e:
-                    logger.error(f"Error processing {station} {year}-{month:02d}: {e}")
-
-                # Move to next month
-                if month == 12:
-                    current_date = current_date.replace(year=year+1, month=1)
+                if raw_data is not None and not raw_data.empty:
+                    # Normalize and store
+                    normalized_data = self.normalize_data(raw_data, area)
+                    self.store_data(normalized_data)
                 else:
-                    current_date = current_date.replace(month=month+1)
+                    logger.warning(f"No data fetched for {area}")
 
-        logger.info("JMA ingestion completed")
+            except Exception as e:
+                logger.error(f"Error processing {area}: {e}")
+                import traceback
+                logger.error(traceback.format_exc())
+
+        logger.info("Radiation data ingestion completed")
 
 def main():
     parser = argparse.ArgumentParser(description='Ingest JMA radiation data')
