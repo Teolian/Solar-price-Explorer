@@ -48,25 +48,31 @@ class JEPXIngester:
         """
         logger.info(f"Attempting to fetch JEPX data for {year}")
 
-        # JEPX download endpoint
-        download_url = "https://www.jepx.jp/_download.php"
+        # JEPX download endpoint - timestamp in query string is CRITICAL!
+        import time
+        timestamp_ms = int(time.time() * 1000)
+        download_url = f"https://www.jepx.jp/_download.php?timestamp={timestamp_ms}"
 
-        # Try different file patterns
+        # Try different file patterns (spot has full 48-slot data)
         file_patterns = [
-            ("spot_summary", f"spot_summary_{year}.csv"),  # Summary with prices
-            ("spot", f"spot_{year}.csv"),  # Raw data
+            ("spot", f"spot_{year}.csv"),  # Full data with 48 time codes - try this first
+            ("spot_summary", f"spot_summary_{year}.csv"),  # Summary
         ]
 
-        # Browser-like headers required by JEPX
+        # Browser-like headers required by JEPX (complete set for WAF bypass)
         headers = {
             'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
-            'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,*/*;q=0.8',
+            'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8,application/signed-exchange;v=b3;q=0.7',
             'Accept-Language': 'ja-JP,ja;q=0.9,en-US;q=0.8,en;q=0.7',
             'Accept-Encoding': 'gzip, deflate, br',
             'Content-Type': 'application/x-www-form-urlencoded',
             'Origin': 'https://www.jepx.jp',
             'Referer': 'https://www.jepx.jp/electricpower/market-data/spot/',
             'Connection': 'keep-alive',
+            'Sec-Fetch-Dest': 'document',
+            'Sec-Fetch-Mode': 'navigate',
+            'Sec-Fetch-Site': 'same-origin',
+            'Upgrade-Insecure-Requests': '1',
             'Cache-Control': 'max-age=0'
         }
 
@@ -80,11 +86,14 @@ class JEPXIngester:
                         'file': file_name
                     }
 
-                    logger.info(f"Trying POST to /_download.php: dir={dir_name}, file={file_name}")
+                    logger.info(f"POST {download_url}")
+                    logger.info(f"  dir={dir_name}, file={file_name}")
                     response = client.post(download_url, data=form_data, headers=headers)
 
-                    if response.status_code == 200 and len(response.content) > 0:
-                        logger.info(f"Successfully fetched {file_name} ({len(response.content)} bytes)")
+                    logger.info(f"  Response: {response.status_code}, {len(response.content)} bytes")
+
+                    if response.status_code == 200 and len(response.content) > 100:  # At least 100 bytes for valid CSV
+                        logger.info(f"✓ Successfully fetched {file_name}")
 
                         # JEPX uses SHIFT_JIS (cp932) encoding
                         try:
@@ -101,15 +110,27 @@ class JEPXIngester:
                         df = pd.read_csv(StringIO(content))
 
                         logger.info(f"Fetched {len(df)} records for {year}")
-                        logger.info(f"Columns: {list(df.columns)[:10]}")  # Log first 10 columns
+                        logger.info(f"Columns: {list(df.columns)[:10]}")
                         return df
 
                     else:
-                        logger.warning(f"POST returned {response.status_code} or empty content for {file_name}")
+                        # Log what we got for debugging
+                        preview = response.content[:200].decode('utf-8', errors='ignore')
+                        logger.warning(f"✗ Failed: {response.status_code}, preview: {preview}")
 
                 except Exception as e:
-                    logger.warning(f"Failed to fetch {file_name}: {e}")
+                    logger.warning(f"✗ Exception for {file_name}: {e}")
                     continue
+
+                # Throttle between attempts (2-3 seconds as recommended)
+                logger.info("  Waiting 2 seconds before next attempt...")
+                import time
+                time.sleep(2)
+
+            # If all patterns failed, try to load from local file
+            local_file = self._try_load_local_file(year)
+            if local_file is not None:
+                return local_file
 
             # If all patterns failed for 2025, try previous year as fallback
             if year >= 2025:
@@ -117,7 +138,45 @@ class JEPXIngester:
                 return self.fetch_yearly_prices(year - 1)
 
             logger.error(f"Could not fetch JEPX data for {year} from any source")
+            logger.info("\n" + "="*60)
+            logger.info("MANUAL DOWNLOAD INSTRUCTIONS:")
+            logger.info("="*60)
+            logger.info("1. Go to https://www.jepx.jp/electricpower/market-data/spot/")
+            logger.info("2. Click 'Data Download' button")
+            logger.info(f"3. Select year {year} and download spot_{year}.csv")
+            logger.info(f"4. Save file to: data/jepx/spot_{year}.csv")
+            logger.info("5. Run: python apps/etl/import_jepx_csv.py --file data/jepx/spot_{}.csv".format(year))
+            logger.info("="*60 + "\n")
             return None
+
+    def _try_load_local_file(self, year: int) -> Optional[pd.DataFrame]:
+        """Try to load JEPX data from local file"""
+        # Check common locations
+        possible_paths = [
+            f"data/jepx/spot_{year}.csv",
+            f"data/jepx/spot_summary_{year}.csv",
+            f"../data/jepx/spot_{year}.csv",
+            f"/data/jepx/spot_{year}.csv"
+        ]
+
+        for path in possible_paths:
+            if os.path.exists(path):
+                logger.info(f"Found local file: {path}")
+                try:
+                    # Try CP932 (Shift_JIS) encoding
+                    try:
+                        df = pd.read_csv(path, encoding='cp932')
+                    except UnicodeDecodeError:
+                        df = pd.read_csv(path, encoding='shift_jis')
+
+                    logger.info(f"✓ Loaded {len(df)} records from local file")
+                    logger.info(f"Columns: {list(df.columns)[:10]}")
+                    return df
+                except Exception as e:
+                    logger.warning(f"Failed to load local file {path}: {e}")
+                    continue
+
+        return None
 
     def fetch_daily_prices(self, date: datetime) -> Optional[pd.DataFrame]:
         """

@@ -90,8 +90,24 @@ fetch-radiation:
 	docker-compose exec -T api python /etl/jma_ingest.py --areas TOKYO,TOHOKU,HOKKAIDO --days 7
 	@echo "Radiation data fetched!"
 
+import-jepx-csv:
+	@echo "Importing manually downloaded JEPX CSV files..."
+	@echo "Place CSV files in data/jepx/ directory first!"
+	@echo "See docs/JEPX_DATA_GUIDE.md for instructions"
+	@if [ -f data/jepx/spot_2024.csv ]; then \
+		docker-compose exec -T api python /etl/import_jepx_csv.py --file /app/data/jepx/spot_2024.csv --areas TOKYO,TOHOKU,HOKKAIDO; \
+	elif [ -f data/jepx/spot_2025.csv ]; then \
+		docker-compose exec -T api python /etl/import_jepx_csv.py --file /app/data/jepx/spot_2025.csv --areas TOKYO,TOHOKU,HOKKAIDO; \
+	else \
+		echo "ERROR: No CSV files found in data/jepx/"; \
+		echo "Download from https://www.jepx.jp/electricpower/market-data/spot/"; \
+		exit 1; \
+	fi
+	@echo "Import complete!"
+
 fetch-real-data:
 	@echo "Fetching real data from JEPX and Open-Meteo..."
+	@echo "Note: JEPX automated download may fail (403). Use 'make import-jepx-csv' for manual import."
 	docker-compose exec -T api python /etl/jepx_ingest.py --areas TOKYO,TOHOKU,HOKKAIDO --start-date 2025-09-01 --end-date 2025-11-10
 	docker-compose exec -T api python /etl/jma_ingest.py --areas TOKYO,TOHOKU,HOKKAIDO --start-date 2025-09-01 --end-date 2025-11-10
 	docker-compose exec -T api python /etl/build_features.py --areas TOKYO,TOHOKU,HOKKAIDO --start-date 2025-09-01 --end-date 2025-11-10
