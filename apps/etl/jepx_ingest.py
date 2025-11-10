@@ -38,9 +38,9 @@ class JEPXIngester:
     def fetch_yearly_prices(self, year: int) -> Optional[pd.DataFrame]:
         """
         Fetch yearly spot prices from JEPX CSV
-        JEPX publishes annual CSV files: https://www.jepx.jp/market/excel/spot_YEAR.csv
+        JEPX publishes annual summary CSV files with prices
         """
-        url = f"https://www.jepx.jp/market/excel/spot_{year}.csv"
+        url = f"https://www.jepx.jp/market/excel/spot_summary_{year}.csv"
         logger.info(f"Fetching JEPX data from {url}")
 
         try:
