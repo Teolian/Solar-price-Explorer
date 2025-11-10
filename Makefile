@@ -1,16 +1,17 @@
-.PHONY: help setup start stop clean test lint
+.PHONY: help setup start stop clean test lint logs test-data
 
 help:
 	@echo "Solar×Price Explorer - Development Commands"
 	@echo ""
-	@echo "make setup    - Setup development environment"
-	@echo "make start    - Start all services with Docker Compose"
-	@echo "make stop     - Stop all services"
-	@echo "make clean    - Clean all containers and volumes"
-	@echo "make test     - Run all tests"
-	@echo "make lint     - Run linters"
-	@echo "make db-init  - Initialize database"
-	@echo "make etl      - Run ETL pipeline"
+	@echo "make setup     - Setup development environment"
+	@echo "make start     - Start all services with Docker Compose"
+	@echo "make stop      - Stop all services"
+	@echo "make clean     - Clean all containers and volumes"
+	@echo "make logs      - View logs from all services"
+	@echo "make db-init   - Initialize database schema"
+	@echo "make test-data - Generate mock test data"
+	@echo "make test      - Run all tests"
+	@echo "make lint      - Run linters"
 
 setup:
 	@echo "Setting up development environment..."
@@ -22,10 +23,26 @@ setup:
 
 start:
 	docker-compose up -d
-	@echo "Services started!"
+	@echo "Services starting..."
+	@echo "Waiting for database..."
+	@sleep 5
+	@echo ""
+	@echo "Services ready!"
 	@echo "API: http://localhost:8000"
+	@echo "API Docs: http://localhost:8000/docs"
 	@echo "Frontend: http://localhost:3000"
-	@echo "Docs: http://localhost:8000/docs"
+	@echo ""
+	@echo "Initialize database with: make db-init"
+	@echo "Generate test data with: make test-data"
+
+logs:
+	docker-compose logs -f
+
+test-data:
+	@echo "Generating test data..."
+	docker-compose exec api python /etl/generate_mock_data.py --areas TOKYO,TOHOKU,HOKKAIDO --days 30
+	docker-compose exec api python /etl/build_features.py --areas TOKYO,TOHOKU,HOKKAIDO --days 30
+	@echo "Test data generated!"
 
 stop:
 	docker-compose down
@@ -47,7 +64,8 @@ lint:
 
 db-init:
 	@echo "Initializing database..."
-	./scripts/setup_db.sh
+	docker-compose exec db psql -U postgres -d solar_explorer < db/migrations/001_initial_schema.sql
+	@echo "Database initialized!"
 
 etl:
 	@echo "Running ETL pipeline..."
