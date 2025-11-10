@@ -40,8 +40,8 @@ logs:
 
 test-data:
 	@echo "Generating test data..."
-	docker-compose exec api python /etl/generate_mock_data.py --areas TOKYO,TOHOKU,HOKKAIDO --days 30
-	docker-compose exec api python /etl/build_features.py --areas TOKYO,TOHOKU,HOKKAIDO --days 30
+	docker-compose exec -T api python /etl/generate_mock_data.py --areas TOKYO,TOHOKU,HOKKAIDO --days 30
+	docker-compose exec -T api python /etl/build_features.py --areas TOKYO,TOHOKU,HOKKAIDO --days 30
 	@echo "Test data generated!"
 
 stop:
@@ -64,7 +64,7 @@ lint:
 
 db-init:
 	@echo "Initializing database..."
-	docker-compose exec db psql -U postgres -d solar_explorer < db/migrations/001_initial_schema.sql
+	docker-compose exec -T db psql -U postgres -d solar_explorer < db/migrations/001_initial_schema.sql
 	@echo "Database initialized!"
 
 etl:
