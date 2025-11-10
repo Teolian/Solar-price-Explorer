@@ -105,15 +105,39 @@ See `deployment_guide_solar_price_explorer_free_tier.md` for details.
 
 ## Features
 
-- Hourly price and radiation time series
-- Correlation analysis (GHI/DNI/DHI ↔ price)
-- ML-based price forecasting (24-168h horizon)
-- Area comparison
-- Data export (CSV, Parquet)
+### Backend
+- REST API with full CRUD operations
+- Time-series data queries with filtering
+- Correlation computation (Pearson coefficient)
+- XGBoost model training and persistence
+- Multi-step price forecasting (1-168h)
+- CSV/Parquet data export
 
-## Timezone
+### Frontend
+- **Overview**: Project introduction and quick start
+- **Correlations**: Analyze GHI/DNI/DHI vs price relationships
+- **Forecast**: Generate and visualize price predictions
+- **Data Explorer**: Browse and export raw data
+- Interactive charts (ECharts)
+- Responsive design (Tailwind CSS)
 
-All timestamps in JST (Asia/Tokyo, UTC+9).
+### Data Coverage
+- 9 JEPX power areas
+- 4 active JMA radiation stations
+- Hourly resolution
+- JST timezone (UTC+9)
+
+## Implementation Status
+
+- ✅ Database schema and migrations
+- ✅ FastAPI REST API with all endpoints
+- ✅ ETL framework (placeholders for JEPX/JMA parsers)
+- ✅ ML model training and forecasting
+- ✅ Next.js frontend with 4 pages
+- ✅ Chart components and data tables
+- ✅ GitHub Actions workflows
+- ⚠️ JEPX/JMA data fetching (requires implementation)
+- ⚠️ Deployment configuration (requires credentials)
 
 ## License
 
