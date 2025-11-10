@@ -82,7 +82,7 @@ ALTER TABLE prices ADD CONSTRAINT unique_price_record
     UNIQUE(timestamp, area);
 
 ALTER TABLE radiation ADD CONSTRAINT unique_radiation_record
-    UNIQUE(timestamp, station);
+    UNIQUE(timestamp, station, area);
 
 ALTER TABLE features ADD CONSTRAINT unique_feature_record
     UNIQUE(timestamp, area);
