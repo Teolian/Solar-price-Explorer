@@ -189,6 +189,8 @@ def main():
                         help='Comma-separated list of areas')
     parser.add_argument('--days', type=int, default=30,
                         help='Number of days to generate (backward from today)')
+    parser.add_argument('--start-date', type=str, help='Start date (YYYY-MM-DD)')
+    parser.add_argument('--end-date', type=str, help='End date (YYYY-MM-DD)')
 
     args = parser.parse_args()
 
