@@ -25,8 +25,11 @@ logger = logging.getLogger(__name__)
 # Constants
 JST = pytz.timezone('Asia/Tokyo')
 
-# Using Open-Meteo Satellite Radiation API for Japan (Himawari satellite)
-OPEN_METEO_BASE = "https://archive-api.open-meteo.com/v1/archive"
+# Using Open-Meteo APIs for Japan
+# Forecast API for recent data (last 7 days + forecast)
+# Archive API for historical data (5+ days ago)
+OPEN_METEO_FORECAST = "https://api.open-meteo.com/v1/forecast"
+OPEN_METEO_ARCHIVE = "https://archive-api.open-meteo.com/v1/archive"
 
 # Representative coordinates for each JEPX area
 AREA_COORDINATES = {
@@ -49,8 +52,8 @@ class JMAIngester:
 
     def fetch_area_data(self, area: str, start_date: datetime, end_date: datetime) -> Optional[pd.DataFrame]:
         """
-        Fetch radiation data for a specific area using Open-Meteo Satellite API
-        Uses Himawari satellite data for Japan
+        Fetch radiation data for a specific area using Open-Meteo APIs
+        Uses Forecast API for recent data (last 7 days) and Archive API for historical
         """
         if area not in AREA_COORDINATES:
             logger.warning(f"Area {area} not found in coordinates map")
@@ -60,22 +63,41 @@ class JMAIngester:
         logger.info(f"Fetching radiation data for {area} ({coords['name']}) from {start_date.date()} to {end_date.date()}")
 
         try:
-            # Format dates for API (UTC timezone)
-            start_str = start_date.strftime('%Y-%m-%d')
-            end_str = end_date.strftime('%Y-%m-%d')
+            # Determine which API to use based on date
+            # Forecast API has past_days parameter for last 92 days
+            # Archive API for older data
+            now = datetime.now(JST)
+            days_ago = (now.date() - start_date.date()).days
 
-            # Build API request
-            params = {
-                'latitude': coords['lat'],
-                'longitude': coords['lon'],
-                'start_date': start_str,
-                'end_date': end_str,
-                'hourly': 'shortwave_radiation,direct_radiation,diffuse_radiation',
-                'timezone': 'Asia/Tokyo'
-            }
+            if days_ago <= 92:
+                # Use Forecast API with past_days
+                api_url = OPEN_METEO_FORECAST
+                params = {
+                    'latitude': coords['lat'],
+                    'longitude': coords['lon'],
+                    'hourly': 'shortwave_radiation,direct_radiation,diffuse_radiation',
+                    'past_days': min(days_ago + 2, 92),  # Add buffer
+                    'forecast_days': 1,
+                    'timezone': 'Asia/Tokyo'
+                }
+                logger.info(f"Using Forecast API with past_days={params['past_days']}")
+            else:
+                # Use Archive API
+                api_url = OPEN_METEO_ARCHIVE
+                start_str = start_date.strftime('%Y-%m-%d')
+                end_str = end_date.strftime('%Y-%m-%d')
+                params = {
+                    'latitude': coords['lat'],
+                    'longitude': coords['lon'],
+                    'start_date': start_str,
+                    'end_date': end_str,
+                    'hourly': 'shortwave_radiation,direct_radiation,diffuse_radiation',
+                    'timezone': 'Asia/Tokyo'
+                }
+                logger.info(f"Using Archive API for {start_str} to {end_str}")
 
             with httpx.Client(timeout=60.0) as client:
-                response = client.get(OPEN_METEO_BASE, params=params)
+                response = client.get(api_url, params=params)
                 response.raise_for_status()
                 data = response.json()
 
@@ -91,6 +113,9 @@ class JMAIngester:
                 'dni': hourly.get('direct_radiation', []),
                 'dhi': hourly.get('diffuse_radiation', []),
             })
+
+            # Filter to requested date range
+            df = df[(df['timestamp'] >= start_date) & (df['timestamp'] <= end_date)]
 
             logger.info(f"Fetched {len(df)} hourly records for {area}")
             return df

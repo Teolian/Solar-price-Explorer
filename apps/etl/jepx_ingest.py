@@ -39,6 +39,7 @@ class JEPXIngester:
         """
         Fetch yearly spot prices from JEPX CSV
         JEPX publishes annual summary CSV files with prices
+        If requested year not available, tries previous year
         """
         url = f"https://www.jepx.jp/market/excel/spot_summary_{year}.csv"
         logger.info(f"Fetching JEPX data from {url}")
@@ -54,6 +55,13 @@ class JEPXIngester:
 
             with httpx.Client(timeout=30.0, follow_redirects=True) as client:
                 response = client.get(url, headers=headers)
+
+                # If 404 and current year, try previous year
+                if response.status_code == 404 and year >= 2024:
+                    logger.warning(f"File for {year} not found, trying {year-1}")
+                    url = f"https://www.jepx.jp/market/excel/spot_summary_{year-1}.csv"
+                    response = client.get(url, headers=headers)
+
                 response.raise_for_status()
 
                 # JEPX uses SHIFT_JIS encoding, try UTF-8 as fallback
