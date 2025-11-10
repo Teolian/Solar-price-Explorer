@@ -1,0 +1,51 @@
+name: ETL JEPX/JMA
+
+on:
+  schedule:
+    # Run at 05:00 and 17:00 UTC (14:00 and 02:00 JST)
+    - cron: '0 5,17 * * *'
+  workflow_dispatch:
+
+jobs:
+  run-etl:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+          cache: 'pip'
+
+      - name: Install dependencies
+        run: |
+          pip install -r apps/api/requirements.txt
+
+      - name: Run JEPX ingestion
+        env:
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+          TZ: Asia/Tokyo
+        run: |
+          python apps/etl/jepx_ingest.py --areas TOKYO,TOHOKU --days 7
+
+      - name: Run JMA ingestion
+        env:
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+          TZ: Asia/Tokyo
+        run: |
+          python apps/etl/jma_ingest.py --areas TOKYO,TOHOKU --days 7
+
+      - name: Build features
+        env:
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+          TZ: Asia/Tokyo
+        run: |
+          python apps/etl/build_features.py --areas TOKYO,TOHOKU --days 7
+
+      - name: Report status
+        if: always()
+        run: |
+          echo "ETL completed at $(date -u +"%Y-%m-%d %H:%M:%S UTC")"
