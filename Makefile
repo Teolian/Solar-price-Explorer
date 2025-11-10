@@ -1,4 +1,4 @@
-.PHONY: help setup start stop clean test lint logs test-data
+.PHONY: help setup start stop clean test lint logs test-data db-clean
 
 help:
 	@echo "Solar×Price Explorer - Development Commands"
@@ -9,6 +9,7 @@ help:
 	@echo "make clean     - Clean all containers and volumes"
 	@echo "make logs      - View logs from all services"
 	@echo "make db-init   - Initialize database schema"
+	@echo "make db-clean  - Clear all data from tables"
 	@echo "make test-data - Generate mock test data"
 	@echo "make test      - Run all tests"
 	@echo "make lint      - Run linters"
@@ -66,6 +67,11 @@ db-init:
 	@echo "Initializing database..."
 	docker-compose exec -T db psql -U postgres -d solar_explorer < db/migrations/001_initial_schema.sql
 	@echo "Database initialized!"
+
+db-clean:
+	@echo "Clearing all data from tables..."
+	@docker-compose exec -T db psql -U postgres -d solar_explorer -c "TRUNCATE TABLE prices, radiation, features, models CASCADE;"
+	@echo "All data cleared!"
 
 etl:
 	@echo "Running ETL pipeline..."
