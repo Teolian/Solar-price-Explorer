@@ -92,7 +92,14 @@ fetch-radiation:
 
 fetch-real-data:
 	@echo "Fetching real data from JEPX and Open-Meteo..."
-	docker-compose exec -T api python /etl/jepx_ingest.py --areas TOKYO,TOHOKU,HOKKAIDO --days 7
-	docker-compose exec -T api python /etl/jma_ingest.py --areas TOKYO,TOHOKU,HOKKAIDO --days 7
-	docker-compose exec -T api python /etl/build_features.py --areas TOKYO,TOHOKU,HOKKAIDO --days 7
+	docker-compose exec -T api python /etl/jepx_ingest.py --areas TOKYO,TOHOKU,HOKKAIDO --start-date 2024-09-01 --end-date 2024-11-10
+	docker-compose exec -T api python /etl/jma_ingest.py --areas TOKYO,TOHOKU,HOKKAIDO --start-date 2024-09-01 --end-date 2024-11-10
+	docker-compose exec -T api python /etl/build_features.py --areas TOKYO,TOHOKU,HOKKAIDO --start-date 2024-09-01 --end-date 2024-11-10
 	@echo "Real data fetched and features built!"
+
+fetch-recent-data:
+	@echo "Fetching recent data (last 30 days)..."
+	docker-compose exec -T api python /etl/jepx_ingest.py --areas TOKYO,TOHOKU,HOKKAIDO --days 30
+	docker-compose exec -T api python /etl/jma_ingest.py --areas TOKYO,TOHOKU,HOKKAIDO --days 30
+	docker-compose exec -T api python /etl/build_features.py --areas TOKYO,TOHOKU,HOKKAIDO --days 30
+	@echo "Recent data fetched!"

@@ -209,6 +209,8 @@ def main():
                         help='Comma-separated list of areas')
     parser.add_argument('--days', type=int, default=7,
                         help='Number of days to process (backward from today)')
+    parser.add_argument('--start-date', type=str, help='Start date (YYYY-MM-DD)')
+    parser.add_argument('--end-date', type=str, help='End date (YYYY-MM-DD)')
 
     args = parser.parse_args()
 
@@ -220,6 +222,15 @@ def main():
 
     # Parse areas
     areas = [a.strip().upper() for a in args.areas.split(',')]
+
+    # Parse date range
+    if args.start_date and args.end_date:
+        # Use explicit date range (not used in run(), but for clarity)
+        logger.info(f"Building features from {args.start_date} to {args.end_date}")
+        days = (datetime.strptime(args.end_date, '%Y-%m-%d') -
+                datetime.strptime(args.start_date, '%Y-%m-%d')).days
+    else:
+        days = args.days
 
     # Run feature building
     builder = FeatureBuilder(database_url)
