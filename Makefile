@@ -90,6 +90,15 @@ fetch-radiation:
 	docker-compose exec -T api python /etl/jma_ingest.py --areas TOKYO,TOHOKU,HOKKAIDO --days 7
 	@echo "Radiation data fetched!"
 
+download-jepx-playwright:
+	@echo "Downloading JEPX data using Playwright automation..."
+	@echo "This will open a browser and download the CSV file"
+	docker-compose exec -T api python /etl/download_jepx_playwright.py \
+		--year 2024 \
+		--output /app/data/jepx/spot_2024.csv \
+		--headless true
+	@echo "✓ Download complete!"
+
 import-jepx-csv:
 	@echo "Importing manually downloaded JEPX CSV files..."
 	@echo "Place CSV files in data/jepx/ directory first!"
@@ -104,6 +113,16 @@ import-jepx-csv:
 		exit 1; \
 	fi
 	@echo "Import complete!"
+
+jepx-etl-pipeline:
+	@echo "Running complete JEPX ETL pipeline..."
+	@echo "This will: download → decode CP932 → normalize → load to DB"
+	docker-compose exec -T api python /etl/jepx_etl_pipeline.py \
+		--year 2024 \
+		--areas TOKYO,TOHOKU,HOKKAIDO \
+		--start-date 2024-09-01 \
+		--end-date 2024-11-10
+	@echo "✓ Pipeline complete!"
 
 fetch-real-data:
 	@echo "Fetching real data from JEPX and Open-Meteo..."

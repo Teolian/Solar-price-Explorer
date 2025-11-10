@@ -37,31 +37,70 @@ python apps/etl/import_jepx_csv.py \
 make fetch-real-data
 ```
 
-## Solution 2: Selenium/Playwright Automation
+## Solution 2: Playwright Automation ⭐ Recommended for Automation
 
-If you need automated downloads, use headless browser automation:
+**We've implemented a complete Playwright-based solution!**
 
-```python
-# Example with Playwright (not yet implemented)
-from playwright.sync_api import sync_playwright
+### Quick Start
 
-with sync_playwright() as p:
-    browser = p.chromium.launch()
-    page = browser.new_page()
-    page.goto('https://www.jepx.jp/electricpower/market-data/spot/')
+```bash
+# Option A: Full ETL pipeline (download + process + load to DB)
+make jepx-etl-pipeline
 
-    # Click Data Download button
-    page.click('text=Data Download')
+# Option B: Just download the CSV
+make download-jepx-playwright
 
-    # Select year and download
-    with page.expect_download() as download_info:
-        page.click('text=ダウンロード')
-
-    download = download_info.value
-    download.save_as('data/jepx/spot_2024.csv')
+# Option C: Use Python script directly
+python apps/etl/download_jepx_playwright.py \
+  --year 2024 \
+  --output data/jepx/spot_2024.csv
 ```
 
-**Note**: Requires `pip install playwright` and `playwright install chromium`
+### Setup Requirements
+
+```bash
+# Install Playwright
+pip install playwright
+
+# Install Chromium browser
+playwright install chromium
+
+# Install system dependencies (Linux/Docker)
+playwright install-deps
+```
+
+### How It Works
+
+The Playwright downloader:
+- ✅ Launches real Chromium browser (bypasses WAF)
+- ✅ Simulates human behavior with realistic delays
+- ✅ Hides automation flags (navigator.webdriver)
+- ✅ Uses Japanese locale and timezone
+- ✅ Automatically finds and clicks download buttons
+- ✅ Saves file with proper encoding (CP932)
+
+### Complete ETL Pipeline
+
+The `jepx_etl_pipeline.py` provides end-to-end automation:
+
+```bash
+# Full pipeline: Download → Decode CP932 → Normalize → Load to DB
+python apps/etl/jepx_etl_pipeline.py \
+  --year 2024 \
+  --areas TOKYO,TOHOKU,HOKKAIDO \
+  --start-date 2024-09-01 \
+  --end-date 2024-11-10
+```
+
+**Pipeline Steps**:
+1. 📥 **Download** - Playwright automation downloads CSV
+2. 🔤 **Decode** - CP932/Shift_JIS → UTF-8
+3. 🔄 **Normalize** - Parse dates, time codes (時刻コード 1-48), area names
+4. 📅 **Filter** - Date range and area filtering
+5. 📊 **Partition** - Analyze data by date
+6. 💾 **Load** - Upsert to PostgreSQL
+
+**See full documentation**: [PLAYWRIGHT_SETUP.md](./PLAYWRIGHT_SETUP.md)
 
 ## Solution 3: Use Mock Data for Development
 
