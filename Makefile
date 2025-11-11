@@ -313,3 +313,16 @@ download-and-process-all:
 	@echo "========================================"
 	@echo "✓ Complete pipeline finished!"
 	@echo "========================================"
+
+# Quick test - download data for single day
+test-download-single-day:
+	@echo "========================================"
+	@echo "TEST: Single Day Download"
+	@echo "========================================"
+	@echo "Quick test to verify downloaders work"
+	@echo "Downloads data for 1 day (2 days ago)"
+	@echo ""
+	docker-compose exec -T api python /etl/test_download_single_day.py --area TOKYO
+	@echo ""
+	@echo "Check results above - at least TEPCO and Open-Meteo should succeed"
+	@echo "========================================"
