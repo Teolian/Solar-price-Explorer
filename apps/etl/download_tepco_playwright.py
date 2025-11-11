@@ -41,7 +41,7 @@ logger = logging.getLogger(__name__)
 # Constants
 TEPCO_DOWNLOAD_URL = "https://www.tepco.co.jp/en/forecast/html/download-e.html"
 TEPCO_DOWNLOAD_JP_URL = "https://www.tepco.co.jp/forecast/html/download-j.html"
-DEFAULT_TIMEOUT = 30000  # 30 seconds
+DEFAULT_TIMEOUT = 60000  # 60 seconds (increased for slow connections)
 DOWNLOAD_TIMEOUT = 120000  # 2 minutes
 
 
@@ -177,10 +177,7 @@ class TEPCODownloader:
                                     download_link = element
                                     logger.info(f"✓ Selected download link for {year}-{month:02d}")
                                     break
-                                elif not download_link and ('.csv' in str(href).lower() or '.zip' in str(href).lower()):
-                                    # Fallback: any CSV/ZIP link
-                                    download_link = element
-                                    logger.info(f"  Candidate link: {href}")
+                                # Note: Removed fallback to "any CSV/ZIP" - we want specific year/month only
 
                         if download_link:
                             break
@@ -280,40 +277,79 @@ class TEPCODownloader:
 
         TEPCO publishes daily files with pattern:
         https://www.tepco.co.jp/forecast/html/images/juyo-YYYYMMDD.csv
+
+        Note: This attempts to download ALL days in the specified month.
+        Recent data (1-2 days ago) should be available.
+        Future dates will return 404.
         """
         logger.info("Attempting direct URL download approach...")
+        logger.info(f"Requesting data for {year}-{month:02d}")
+        logger.info("Note: TEPCO publishes with ~1 day lag. Recent dates should work.")
 
         page = context.new_page()
 
         try:
             # Try downloading all days in the month
             import calendar
+            from datetime import datetime, timedelta
+
             days_in_month = calendar.monthrange(year, month)[1]
+            today = datetime.now()
+
+            # Don't try to download future dates
+            if year == today.year and month == today.month:
+                max_day = min(days_in_month, today.day - 1)  # Yesterday at most
+                logger.info(f"Current month - will try up to day {max_day} (yesterday)")
+            elif year > today.year or (year == today.year and month > today.month):
+                logger.error(f"Cannot download future data: {year}-{month:02d}")
+                logger.error(f"Current date: {today.strftime('%Y-%m-%d')}")
+                return None
+            else:
+                max_day = days_in_month
 
             downloaded_files = []
 
-            for day in range(1, days_in_month + 1):
+            for day in range(1, max_day + 1):
                 date_str = f"{year}{month:02d}{day:02d}"
                 url = f"https://www.tepco.co.jp/forecast/html/images/juyo-{date_str}.csv"
 
-                logger.info(f"Trying {url}")
+                logger.info(f"Trying {date_str}...")
 
                 try:
-                    with page.expect_download(timeout=10000) as download_promise:
-                        page.goto(url)
-                        download_info = download_promise.value
+                    # Try to navigate to the URL
+                    response = page.goto(url, wait_until='load', timeout=10000)
 
-                    output_file = output_path / f"juyo-{date_str}.csv"
-                    download_info.save_as(str(output_file))
+                    # Check if we got a valid response
+                    if response and response.status == 200:
+                        # Check if it's actually a CSV (not an error page)
+                        content_type = response.headers.get('content-type', '')
+                        if 'text/csv' in content_type or 'application/csv' in content_type or 'octet-stream' in content_type:
+                            # Download via expect_download
+                            output_file = output_path / f"juyo-{date_str}.csv"
 
-                    if output_file.exists() and output_file.stat().st_size > 0:
-                        logger.info(f"✓ Downloaded: {output_file.name}")
-                        downloaded_files.append(str(output_file))
+                            # Get page content and save
+                            content = page.content()
+                            with open(output_file, 'w', encoding='utf-8') as f:
+                                f.write(content)
+
+                            if output_file.exists() and output_file.stat().st_size > 0:
+                                logger.info(f"  ✓ Downloaded: {output_file.name}")
+                                downloaded_files.append(str(output_file))
+                            else:
+                                logger.debug(f"  ✗ Failed: {date_str}")
+                        else:
+                            logger.debug(f"  ✗ Not a CSV: {date_str} (content-type: {content_type})")
+                    elif response and response.status == 404:
+                        logger.debug(f"  ✗ Not found: {date_str}")
+                    elif response and response.status == 403:
+                        logger.warning(f"  ⚠ Access denied: {date_str} (403 Forbidden)")
+                        logger.warning("  TEPCO may be blocking automated requests")
+                        break  # Stop trying if we hit 403
                     else:
-                        logger.debug(f"✗ Failed: {date_str}")
+                        logger.debug(f"  ✗ HTTP {response.status if response else 'N/A'}: {date_str}")
 
                 except Exception as e:
-                    logger.debug(f"✗ Day {day}: {e}")
+                    logger.debug(f"  ✗ Error on day {day}: {str(e)[:100]}")
                     continue
 
                 # Small delay between requests
@@ -324,6 +360,12 @@ class TEPCODownloader:
                 return downloaded_files[0]  # Return first file as example
             else:
                 logger.error("Could not download any files via direct URL")
+                logger.error(f"Tried dates: {year}-{month:02d}-01 to {year}-{month:02d}-{max_day:02d}")
+                logger.error("Possible reasons:")
+                logger.error("  - Data not yet published (1-2 day lag)")
+                logger.error("  - Future dates requested")
+                logger.error("  - 403 Forbidden (access blocked)")
+                logger.error("  - Website structure changed")
                 return None
 
         finally:

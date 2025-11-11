@@ -51,8 +51,8 @@ AREA_PAGES = {
     'SHIKOKU': 'Shikoku_main.html',
     'HOKURIKU': 'Hokuriku_main.html'
 }
-DEFAULT_TIMEOUT = 30000  # 30 seconds
-DOWNLOAD_TIMEOUT = 120000  # 2 minutes
+DEFAULT_TIMEOUT = 90000  # 90 seconds (increased - site is slow)
+DOWNLOAD_TIMEOUT = 180000  # 3 minutes
 
 
 class JapanesePowerDownloader:
@@ -134,7 +134,14 @@ class JapanesePowerDownloader:
             try:
                 # Step 1: Navigate to area page
                 logger.info(f"Navigating to {page_url}")
-                page.goto(page_url, wait_until='networkidle', timeout=DEFAULT_TIMEOUT)
+                logger.info(f"Timeout: {DEFAULT_TIMEOUT/1000}s (site may be slow)")
+
+                try:
+                    page.goto(page_url, wait_until='networkidle', timeout=DEFAULT_TIMEOUT)
+                except Exception as e:
+                    logger.warning(f"networkidle timeout, trying 'load' instead: {e}")
+                    # Fallback: just wait for 'load' instead of 'networkidle'
+                    page.goto(page_url, wait_until='load', timeout=DEFAULT_TIMEOUT)
 
                 # Human-like pause
                 time.sleep(2)
@@ -267,9 +274,19 @@ class JapanesePowerDownloader:
 
             except PlaywrightTimeout as e:
                 logger.error(f"Timeout error: {e}")
-                screenshot_path = output_path / f"japanesepower_{area}_timeout.png"
-                page.screenshot(path=str(screenshot_path))
-                logger.error(f"Screenshot saved to {screenshot_path}")
+                logger.error(f"Site: {page_url}")
+                logger.error("Possible reasons:")
+                logger.error("  - JapanesePower.org is offline or very slow")
+                logger.error("  - Network connectivity issues")
+                logger.error("  - Site blocking automated access")
+
+                try:
+                    screenshot_path = output_path / f"japanesepower_{area}_timeout.png"
+                    page.screenshot(path=str(screenshot_path), timeout=10000)
+                    logger.error(f"Screenshot saved to {screenshot_path}")
+                except Exception as screenshot_error:
+                    logger.error(f"Could not save screenshot: {screenshot_error}")
+
                 return []
 
             except Exception as e:
