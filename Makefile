@@ -141,3 +141,41 @@ fetch-recent-data:
 	docker-compose exec -T api python /etl/jma_ingest.py --areas TOKYO,TOHOKU,HOKKAIDO --days 30
 	docker-compose exec -T api python /etl/build_features.py --areas TOKYO,TOHOKU,HOKKAIDO --days 30
 	@echo "Recent data fetched!"
+
+# Alternative data sources (recommended - no 403 errors!)
+
+fetch-tepco-demand:
+	@echo "Fetching TEPCO demand data (Tokyo area)..."
+	@echo "Source: TEPCO official CSV downloads"
+	@echo "Period: Sept 1 - Nov 11, 2025"
+	docker-compose exec -T api python /etl/tepco_demand_ingest.py \
+		--start-date 2025-09-01 \
+		--end-date 2025-11-11
+	@echo "✓ TEPCO demand data fetched!"
+
+fetch-japanesepower-prices:
+	@echo "Fetching JEPX prices from JapanesePower.org..."
+	@echo "Source: JapanesePower.org (JEPX Spot History CSV)"
+	@echo "Period: Sept 1 - Nov 11, 2025"
+	docker-compose exec -T api python /etl/japanesepower_ingest.py \
+		--areas TOKYO,TOHOKU,HOKKAIDO \
+		--start-date 2025-09-01 \
+		--end-date 2025-11-11
+	@echo "✓ JEPX prices fetched from JapanesePower.org!"
+
+fetch-alternative-data:
+	@echo "Fetching data from alternative sources..."
+	@echo "Using: TEPCO (demand) + JapanesePower.org (JEPX prices) + Open-Meteo (radiation)"
+	@echo "Period: Sept 1 - Nov 11, 2025"
+	@echo ""
+	make fetch-tepco-demand
+	make fetch-japanesepower-prices
+	make fetch-radiation
+	@echo ""
+	@echo "✓ All alternative data sources fetched!"
+	@echo "Building features..."
+	docker-compose exec -T api python /etl/build_features.py \
+		--areas TOKYO,TOHOKU,HOKKAIDO \
+		--start-date 2025-09-01 \
+		--end-date 2025-11-11
+	@echo "✓ Complete pipeline finished!"
