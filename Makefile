@@ -93,9 +93,10 @@ fetch-radiation:
 download-jepx-playwright:
 	@echo "Downloading JEPX data using Playwright automation..."
 	@echo "This will open a browser and download the CSV file"
+	@echo "Target: Sept-Nov 2025 (until 11.11.2025)"
 	docker-compose exec -T api python /etl/download_jepx_playwright.py \
-		--year 2024 \
-		--output /app/data/jepx/spot_2024.csv \
+		--year 2025 \
+		--output /app/data/jepx/spot_2025.csv \
 		--headless true
 	@echo "✓ Download complete!"
 
@@ -103,10 +104,10 @@ import-jepx-csv:
 	@echo "Importing manually downloaded JEPX CSV files..."
 	@echo "Place CSV files in data/jepx/ directory first!"
 	@echo "See docs/JEPX_DATA_GUIDE.md for instructions"
-	@if [ -f data/jepx/spot_2024.csv ]; then \
-		docker-compose exec -T api python /etl/import_jepx_csv.py --file /app/data/jepx/spot_2024.csv --areas TOKYO,TOHOKU,HOKKAIDO; \
-	elif [ -f data/jepx/spot_2025.csv ]; then \
+	@if [ -f data/jepx/spot_2025.csv ]; then \
 		docker-compose exec -T api python /etl/import_jepx_csv.py --file /app/data/jepx/spot_2025.csv --areas TOKYO,TOHOKU,HOKKAIDO; \
+	elif [ -f data/jepx/spot_2024.csv ]; then \
+		docker-compose exec -T api python /etl/import_jepx_csv.py --file /app/data/jepx/spot_2024.csv --areas TOKYO,TOHOKU,HOKKAIDO; \
 	else \
 		echo "ERROR: No CSV files found in data/jepx/"; \
 		echo "Download from https://www.jepx.jp/electricpower/market-data/spot/"; \
@@ -117,19 +118,21 @@ import-jepx-csv:
 jepx-etl-pipeline:
 	@echo "Running complete JEPX ETL pipeline..."
 	@echo "This will: download → decode CP932 → normalize → load to DB"
+	@echo "Period: Sept 1 - Nov 11, 2025"
 	docker-compose exec -T api python /etl/jepx_etl_pipeline.py \
-		--year 2024 \
+		--year 2025 \
 		--areas TOKYO,TOHOKU,HOKKAIDO \
-		--start-date 2024-09-01 \
-		--end-date 2024-11-10
+		--start-date 2025-09-01 \
+		--end-date 2025-11-11
 	@echo "✓ Pipeline complete!"
 
 fetch-real-data:
 	@echo "Fetching real data from JEPX and Open-Meteo..."
+	@echo "Period: Sept 1 - Nov 11, 2025"
 	@echo "Note: JEPX automated download may fail (403). Use 'make import-jepx-csv' for manual import."
-	docker-compose exec -T api python /etl/jepx_ingest.py --areas TOKYO,TOHOKU,HOKKAIDO --start-date 2025-09-01 --end-date 2025-11-10
-	docker-compose exec -T api python /etl/jma_ingest.py --areas TOKYO,TOHOKU,HOKKAIDO --start-date 2025-09-01 --end-date 2025-11-10
-	docker-compose exec -T api python /etl/build_features.py --areas TOKYO,TOHOKU,HOKKAIDO --start-date 2025-09-01 --end-date 2025-11-10
+	docker-compose exec -T api python /etl/jepx_ingest.py --areas TOKYO,TOHOKU,HOKKAIDO --start-date 2025-09-01 --end-date 2025-11-11
+	docker-compose exec -T api python /etl/jma_ingest.py --areas TOKYO,TOHOKU,HOKKAIDO --start-date 2025-09-01 --end-date 2025-11-11
+	docker-compose exec -T api python /etl/build_features.py --areas TOKYO,TOHOKU,HOKKAIDO --start-date 2025-09-01 --end-date 2025-11-11
 	@echo "Real data fetched and features built!"
 
 fetch-recent-data:
