@@ -3,19 +3,35 @@
 help:
 	@echo "Solar×Price Explorer - Development Commands"
 	@echo ""
+	@echo "=== Setup & Services ==="
 	@echo "make setup          - Setup development environment"
 	@echo "make start          - Start all services with Docker Compose"
 	@echo "make stop           - Stop all services"
 	@echo "make clean          - Clean all containers and volumes"
 	@echo "make logs           - View logs from all services"
+	@echo ""
+	@echo "=== Database ==="
 	@echo "make db-init        - Initialize database schema"
 	@echo "make db-clean       - Clear all data from tables"
+	@echo ""
+	@echo "=== Data Collection (RECOMMENDED) ==="
+	@echo "make download-all-playwright     - Download ALL data with Playwright (bypasses 403)"
+	@echo "make download-jepx-playwright    - Download JEPX data only"
+	@echo "make download-tepco-playwright   - Download TEPCO demand data"
+	@echo "make download-japanesepower-playwright - Download JapanesePower.org JEPX data"
+	@echo "make download-and-process-all    - Complete pipeline: download + process + features"
+	@echo ""
+	@echo "=== Data Processing ==="
 	@echo "make test-data      - Generate mock test data"
-	@echo "make fetch-real-data - Fetch real JEPX and radiation data (last 7 days)"
-	@echo "make fetch-jepx     - Fetch real JEPX price data only"
-	@echo "make fetch-radiation - Fetch real solar radiation data only"
+	@echo "make import-jepx-csv - Import manually downloaded JEPX CSV"
+	@echo "make fetch-radiation - Fetch solar radiation from Open-Meteo"
+	@echo ""
+	@echo "=== Testing ==="
 	@echo "make test           - Run all tests"
 	@echo "make lint           - Run linters"
+	@echo ""
+	@echo "NOTE: Direct HTTP fetching (fetch-real-data) returns 403 errors."
+	@echo "      Use Playwright automation instead!"
 
 setup:
 	@echo "Setting up development environment..."
@@ -100,6 +116,80 @@ download-jepx-playwright:
 		--headless true
 	@echo "✓ Download complete!"
 
+download-tepco-playwright:
+	@echo "Downloading TEPCO demand data using Playwright automation..."
+	@echo "This will download CSV files for September-November 2025"
+	@echo "Source: TEPCO official demand forecast data"
+	docker-compose exec -T api python /etl/download_tepco_playwright.py \
+		--year 2025 \
+		--month 9 \
+		--output /app/data/tepco \
+		--headless true
+	docker-compose exec -T api python /etl/download_tepco_playwright.py \
+		--year 2025 \
+		--month 10 \
+		--output /app/data/tepco \
+		--headless true
+	docker-compose exec -T api python /etl/download_tepco_playwright.py \
+		--year 2025 \
+		--month 11 \
+		--output /app/data/tepco \
+		--headless true
+	@echo "✓ TEPCO downloads complete!"
+
+download-japanesepower-playwright:
+	@echo "Downloading JEPX prices from JapanesePower.org using Playwright..."
+	@echo "This will download CSV files for all areas"
+	@echo "Source: JapanesePower.org community JEPX data"
+	docker-compose exec -T api python /etl/download_japanesepower_playwright.py \
+		--area TOKYO \
+		--output /app/data/japanesepower \
+		--headless true
+	docker-compose exec -T api python /etl/download_japanesepower_playwright.py \
+		--area TOHOKU \
+		--output /app/data/japanesepower \
+		--headless true
+	docker-compose exec -T api python /etl/download_japanesepower_playwright.py \
+		--area HOKKAIDO \
+		--output /app/data/japanesepower \
+		--headless true
+	@echo "✓ JapanesePower.org downloads complete!"
+
+download-all-playwright:
+	@echo "========================================"
+	@echo "Playwright Download Suite"
+	@echo "========================================"
+	@echo "Downloading data from all sources using browser automation"
+	@echo "This bypasses 403 errors by simulating real browser behavior"
+	@echo ""
+	@echo "Sources:"
+	@echo "  1. JEPX (jepx.jp) - Spot market prices"
+	@echo "  2. TEPCO (tepco.co.jp) - Tokyo demand data"
+	@echo "  3. JapanesePower.org - JEPX historical archives"
+	@echo ""
+	@echo "Period: September-November 2025"
+	@echo "========================================"
+	@echo ""
+	make download-jepx-playwright
+	@echo ""
+	make download-tepco-playwright
+	@echo ""
+	make download-japanesepower-playwright
+	@echo ""
+	@echo "========================================"
+	@echo "✓ All Playwright downloads complete!"
+	@echo "========================================"
+	@echo ""
+	@echo "Downloaded files are in:"
+	@echo "  - data/jepx/"
+	@echo "  - data/tepco/"
+	@echo "  - data/japanesepower/"
+	@echo ""
+	@echo "Next steps:"
+	@echo "  1. Import JEPX: make import-jepx-csv"
+	@echo "  2. Process all data and build features"
+	@echo "========================================"
+
 import-jepx-csv:
 	@echo "Importing manually downloaded JEPX CSV files..."
 	@echo "Place CSV files in data/jepx/ directory first!"
@@ -142,9 +232,12 @@ fetch-recent-data:
 	docker-compose exec -T api python /etl/build_features.py --areas TOKYO,TOHOKU,HOKKAIDO --days 30
 	@echo "Recent data fetched!"
 
-# Alternative data sources (recommended - no 403 errors!)
+# Alternative data sources with Playwright automation
 
 fetch-tepco-demand:
+	@echo "⚠️  WARNING: Direct HTTP fetch may return 403 Forbidden"
+	@echo "Consider using: make download-tepco-playwright"
+	@echo ""
 	@echo "Fetching TEPCO demand data (Tokyo area)..."
 	@echo "Source: TEPCO official CSV downloads"
 	@echo "Period: Sept 1 - Nov 11, 2025"
@@ -154,6 +247,9 @@ fetch-tepco-demand:
 	@echo "✓ TEPCO demand data fetched!"
 
 fetch-japanesepower-prices:
+	@echo "⚠️  WARNING: Direct HTTP fetch may return 403 Forbidden"
+	@echo "Consider using: make download-japanesepower-playwright"
+	@echo ""
 	@echo "Fetching JEPX prices from JapanesePower.org..."
 	@echo "Source: JapanesePower.org (JEPX Spot History CSV)"
 	@echo "Period: Sept 1 - Nov 11, 2025"
@@ -164,6 +260,9 @@ fetch-japanesepower-prices:
 	@echo "✓ JEPX prices fetched from JapanesePower.org!"
 
 fetch-alternative-data:
+	@echo "⚠️  DEPRECATED: Direct HTTP fetching returns 403 errors"
+	@echo "Use Playwright automation instead: make download-all-playwright"
+	@echo ""
 	@echo "Fetching data from alternative sources..."
 	@echo "Using: TEPCO (demand) + JapanesePower.org (JEPX prices) + Open-Meteo (radiation)"
 	@echo "Period: Sept 1 - Nov 11, 2025"
@@ -179,3 +278,38 @@ fetch-alternative-data:
 		--start-date 2025-09-01 \
 		--end-date 2025-11-11
 	@echo "✓ Complete pipeline finished!"
+
+# RECOMMENDED: Complete Playwright pipeline
+download-and-process-all:
+	@echo "========================================"
+	@echo "Complete Data Pipeline with Playwright"
+	@echo "========================================"
+	@echo "This is the RECOMMENDED approach for collecting Japanese energy data"
+	@echo ""
+	@echo "Steps:"
+	@echo "  1. Download JEPX, TEPCO, JapanesePower.org data (Playwright)"
+	@echo "  2. Fetch Open-Meteo solar radiation (API)"
+	@echo "  3. Import all downloaded files to database"
+	@echo "  4. Build ML features"
+	@echo ""
+	@echo "Period: September 1 - November 11, 2025"
+	@echo "========================================"
+	@echo ""
+	@echo "Step 1: Downloading with Playwright..."
+	make download-all-playwright
+	@echo ""
+	@echo "Step 2: Fetching solar radiation..."
+	make fetch-radiation
+	@echo ""
+	@echo "Step 3: Importing data to database..."
+	@echo "TODO: Add import commands here"
+	@echo ""
+	@echo "Step 4: Building features..."
+	docker-compose exec -T api python /etl/build_features.py \
+		--areas TOKYO,TOHOKU,HOKKAIDO \
+		--start-date 2025-09-01 \
+		--end-date 2025-11-11
+	@echo ""
+	@echo "========================================"
+	@echo "✓ Complete pipeline finished!"
+	@echo "========================================"

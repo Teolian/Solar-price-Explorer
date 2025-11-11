@@ -4,9 +4,11 @@
 
 JEPX website blocks automated downloads (HTTP 403), even with Playwright automation. Manual downloads are tedious and not suitable for automated pipelines.
 
-## ✅ Recommended Solution: Alternative Data Sources
+## ✅ Recommended Solution: Playwright Browser Automation
 
-We've implemented parsers for reliable, publicly accessible data sources that provide the same JEPX spot price data without the access restrictions.
+All Japanese energy data sources (JEPX, TEPCO, JapanesePower.org) implement WAF/bot protection and return 403 Forbidden for direct HTTP requests.
+
+**Solution**: We use Playwright browser automation to simulate real user behavior and download data successfully. This bypasses access restrictions by using a real browser environment.
 
 ---
 
@@ -121,32 +123,47 @@ make fetch-radiation
 
 ---
 
-## Complete Alternative Pipeline
+## Complete Playwright Pipeline
 
-**One command to fetch everything from alternative sources:**
+**One command to download and process everything:**
 
 ```bash
-make fetch-alternative-data
+make download-and-process-all
 ```
 
 This will:
-1. ✅ Fetch TEPCO demand data (Tokyo)
-2. ✅ Fetch JEPX prices from JapanesePower.org (Tokyo, Tohoku, Hokkaido)
-3. ✅ Fetch solar radiation from Open-Meteo
-4. ✅ Build ML features from all data sources
+1. ✅ Download JEPX data from jepx.jp (Playwright)
+2. ✅ Download TEPCO demand data (Playwright)
+3. ✅ Download JapanesePower.org JEPX historical data (Playwright)
+4. ✅ Fetch solar radiation from Open-Meteo (API - no auth required)
+5. ✅ Import all downloaded files to database
+6. ✅ Build ML features from all data sources
+
+**Individual download commands:**
+
+```bash
+# Download all sources with Playwright
+make download-all-playwright
+
+# Or download each source separately
+make download-jepx-playwright
+make download-tepco-playwright
+make download-japanesepower-playwright
+```
 
 ---
 
-## Comparison: Direct JEPX vs Alternative Sources
+## Comparison: HTTP Requests vs Playwright Automation
 
-| Feature | Direct JEPX | Alternative Sources |
-|---------|-------------|---------------------|
-| **Access** | ❌ Blocked (403) | ✅ Public API/CSV |
-| **Automation** | ❌ Requires Playwright/manual | ✅ Simple HTTP requests |
-| **Reliability** | ⚠️ WAF protection | ✅ Stable |
-| **Data Coverage** | ✅ Official, complete | ✅ Same data, community-curated |
-| **Update Speed** | ✅ Real-time | ⚠️ Daily updates |
-| **Legal** | ⚠️ TOS restrictions | ✅ Public info use OK |
+| Feature | Direct HTTP | Playwright Automation |
+|---------|-------------|----------------------|
+| **Access** | ❌ Blocked (403) | ✅ Works (simulates browser) |
+| **Automation** | ❌ Fails immediately | ✅ Automated downloads |
+| **Reliability** | ❌ WAF blocks all requests | ✅ Stable with proper delays |
+| **Data Coverage** | ❌ No access | ✅ Full access to official data |
+| **Speed** | ⚠️ N/A (blocked) | ⚠️ Slower (browser overhead) |
+| **Implementation** | ✅ Simple code | ⚠️ More complex (browser automation) |
+| **Legal** | ⚠️ May violate TOS | ⚠️ May violate TOS (review carefully) |
 
 ---
 
