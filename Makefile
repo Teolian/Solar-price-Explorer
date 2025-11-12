@@ -1,4 +1,4 @@
-.PHONY: help setup start stop clean test lint logs test-data db-clean fetch-real-data fetch-jepx fetch-radiation
+.PHONY: help setup start stop restart clean test lint logs test-data db-clean fetch-real-data fetch-jepx fetch-radiation
 
 help:
 	@echo "Solar×Price Explorer - Development Commands"
@@ -7,6 +7,7 @@ help:
 	@echo "make setup          - Setup development environment"
 	@echo "make start          - Start all services with Docker Compose"
 	@echo "make stop           - Stop all services"
+	@echo "make restart        - Restart services with latest code (USE THIS AFTER GIT PULL!)"
 	@echo "make clean          - Clean all containers and volumes"
 	@echo "make logs           - View logs from all services"
 	@echo ""
@@ -70,6 +71,18 @@ test-data:
 
 stop:
 	docker-compose down
+
+restart:
+	@echo "Restarting services with latest code..."
+	docker-compose down
+	docker-compose up -d --build
+	@echo ""
+	@echo "✓ Services restarted!"
+	@echo "  API: http://localhost:8000"
+	@echo "  API Docs: http://localhost:8000/docs"
+	@echo "  Frontend: http://localhost:3000"
+	@echo ""
+	@echo "Check new endpoints at /docs"
 
 clean:
 	docker-compose down -v
