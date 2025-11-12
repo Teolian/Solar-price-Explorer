@@ -42,6 +42,22 @@ export default function RootLayout({
                 </li>
                 <li>
                   <Link
+                    href="/insights"
+                    className="hover:text-primary transition-colors"
+                  >
+                    Hourly Patterns
+                  </Link>
+                </li>
+                <li>
+                  <Link
+                    href="/compare"
+                    className="hover:text-primary transition-colors"
+                  >
+                    Compare Areas
+                  </Link>
+                </li>
+                <li>
+                  <Link
                     href="/correlations"
                     className="hover:text-primary transition-colors"
                   >

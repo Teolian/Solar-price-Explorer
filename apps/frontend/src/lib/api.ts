@@ -42,6 +42,42 @@ export interface ForecastResponse {
   points: ForecastPoint[]
 }
 
+export interface HourlyPattern {
+  hour: number
+  avg_price: number
+  avg_ghi: number
+  avg_dni?: number
+  avg_dhi?: number
+  count: number
+}
+
+export interface HourlyPatternsResponse {
+  area: string
+  date_range: {
+    from: string
+    to: string
+  }
+  patterns: HourlyPattern[]
+}
+
+export interface AreaStats {
+  area: string
+  avg_price: number
+  min_price: number
+  max_price: number
+  avg_ghi: number
+  correlation?: number
+  data_points: number
+}
+
+export interface MultiAreaComparisonResponse {
+  date_range: {
+    from: string
+    to: string
+  }
+  areas: AreaStats[]
+}
+
 export const api = {
   async getAreas(): Promise<Area> {
     const res = await fetch(`${API_BASE}/api/areas`)
@@ -99,6 +135,34 @@ export const api = {
       body: JSON.stringify({ area, horizon_hours }),
     })
     if (!res.ok) throw new Error('Failed to generate forecast')
+    return res.json()
+  },
+
+  async getHourlyPatterns(
+    area: string,
+    from?: string,
+    to?: string
+  ): Promise<HourlyPatternsResponse> {
+    const params = new URLSearchParams({ area })
+    if (from) params.append('from_date', from)
+    if (to) params.append('to_date', to)
+
+    const res = await fetch(`${API_BASE}/api/stats/hourly-patterns?${params}`)
+    if (!res.ok) throw new Error('Failed to fetch hourly patterns')
+    return res.json()
+  },
+
+  async getMultiAreaComparison(
+    areas: string[],
+    from?: string,
+    to?: string
+  ): Promise<MultiAreaComparisonResponse> {
+    const params = new URLSearchParams({ areas: areas.join(',') })
+    if (from) params.append('from_date', from)
+    if (to) params.append('to_date', to)
+
+    const res = await fetch(`${API_BASE}/api/stats/multi-area-comparison?${params}`)
+    if (!res.ok) throw new Error('Failed to fetch multi-area comparison')
     return res.json()
   },
 }

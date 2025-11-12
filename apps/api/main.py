@@ -66,6 +66,32 @@ class CorrelationResult(BaseModel):
     r_dni: Optional[float] = None
     r_dhi: Optional[float] = None
 
+class HourlyPattern(BaseModel):
+    hour: int
+    avg_price: float
+    avg_ghi: float
+    avg_dni: Optional[float] = None
+    avg_dhi: Optional[float] = None
+    count: int
+
+class HourlyPatternsResponse(BaseModel):
+    area: str
+    date_range: dict
+    patterns: List[HourlyPattern]
+
+class AreaStats(BaseModel):
+    area: str
+    avg_price: float
+    min_price: float
+    max_price: float
+    avg_ghi: float
+    correlation: Optional[float] = None
+    data_points: int
+
+class MultiAreaComparisonResponse(BaseModel):
+    date_range: dict
+    areas: List[AreaStats]
+
 class TrainRequest(BaseModel):
     area: str
     target: str = "area_price"
@@ -229,6 +255,192 @@ async def get_correlations(
     corr_results['period'] = period
 
     return corr_results
+
+@app.get("/api/stats/hourly-patterns", response_model=HourlyPatternsResponse)
+async def get_hourly_patterns(
+    area: str = Query(..., description="Area code (e.g., TOKYO, HOKKAIDO)"),
+    from_date: Optional[str] = Query(None, description="Start date (ISO format)"),
+    to_date: Optional[str] = Query(None, description="End date (ISO format)"),
+    db: Session = Depends(get_db)
+):
+    """
+    Get hourly patterns showing average prices and solar radiation by hour of day.
+    This reveals how solar generation affects prices throughout the day.
+    """
+    # Parse dates
+    if from_date and to_date:
+        start_date = datetime.fromisoformat(from_date.replace('Z', '+00:00'))
+        end_date = datetime.fromisoformat(to_date.replace('Z', '+00:00'))
+    else:
+        # Default to last 30 days
+        end_date = datetime.now(JST)
+        start_date = end_date - timedelta(days=30)
+
+    # Fetch prices and radiation data
+    prices = db.query(
+        func.extract('hour', Price.timestamp).label('hour'),
+        func.avg(Price.area_price_jpy_kwh).label('avg_price'),
+        func.count(Price.id).label('count')
+    ).filter(
+        and_(
+            Price.area == area.upper(),
+            Price.timestamp >= start_date,
+            Price.timestamp <= end_date
+        )
+    ).group_by(func.extract('hour', Price.timestamp)).all()
+
+    radiation = db.query(
+        func.extract('hour', Radiation.timestamp).label('hour'),
+        func.avg(Radiation.ghi).label('avg_ghi'),
+        func.avg(Radiation.dni).label('avg_dni'),
+        func.avg(Radiation.dhi).label('avg_dhi')
+    ).filter(
+        and_(
+            Radiation.area == area.upper(),
+            Radiation.timestamp >= start_date,
+            Radiation.timestamp <= end_date
+        )
+    ).group_by(func.extract('hour', Radiation.timestamp)).all()
+
+    if not prices:
+        raise HTTPException(
+            status_code=404,
+            detail=f"No price data available for {area}"
+        )
+
+    # Merge prices and radiation by hour
+    radiation_by_hour = {int(r.hour): r for r in radiation}
+
+    patterns = []
+    for p in prices:
+        hour = int(p.hour)
+        rad = radiation_by_hour.get(hour)
+
+        patterns.append(HourlyPattern(
+            hour=hour,
+            avg_price=round(p.avg_price, 2),
+            avg_ghi=round(rad.avg_ghi, 2) if rad and rad.avg_ghi else 0.0,
+            avg_dni=round(rad.avg_dni, 2) if rad and rad.avg_dni else None,
+            avg_dhi=round(rad.avg_dhi, 2) if rad and rad.avg_dhi else None,
+            count=p.count
+        ))
+
+    # Sort by hour
+    patterns.sort(key=lambda x: x.hour)
+
+    return HourlyPatternsResponse(
+        area=area.upper(),
+        date_range={
+            "from": start_date.isoformat(),
+            "to": end_date.isoformat()
+        },
+        patterns=patterns
+    )
+
+@app.get("/api/stats/multi-area-comparison", response_model=MultiAreaComparisonResponse)
+async def get_multi_area_comparison(
+    areas: str = Query(..., description="Comma-separated list of areas (e.g., TOKYO,OSAKA,HOKKAIDO)"),
+    from_date: Optional[str] = Query(None, description="Start date (ISO format)"),
+    to_date: Optional[str] = Query(None, description="End date (ISO format)"),
+    db: Session = Depends(get_db)
+):
+    """
+    Compare statistics across multiple areas.
+    Returns aggregated metrics for each area including avg/min/max price, solar radiation, and correlation.
+    """
+    # Parse areas
+    area_list = [a.strip().upper() for a in areas.split(',')]
+
+    # Parse dates - default to last 30 days
+    if from_date and to_date:
+        start_date = datetime.fromisoformat(from_date.replace('Z', '+00:00'))
+        end_date = datetime.fromisoformat(to_date.replace('Z', '+00:00'))
+    else:
+        end_date = datetime.now(JST)
+        start_date = end_date - timedelta(days=30)
+
+    area_stats_list = []
+
+    for area in area_list:
+        # Fetch price statistics
+        price_stats = db.query(
+            func.avg(Price.area_price_jpy_kwh).label('avg_price'),
+            func.min(Price.area_price_jpy_kwh).label('min_price'),
+            func.max(Price.area_price_jpy_kwh).label('max_price'),
+            func.count(Price.id).label('count')
+        ).filter(
+            and_(
+                Price.area == area,
+                Price.timestamp >= start_date,
+                Price.timestamp <= end_date
+            )
+        ).first()
+
+        # Fetch radiation statistics
+        rad_stats = db.query(
+            func.avg(Radiation.ghi).label('avg_ghi')
+        ).filter(
+            and_(
+                Radiation.area == area,
+                Radiation.timestamp >= start_date,
+                Radiation.timestamp <= end_date
+            )
+        ).first()
+
+        # Calculate correlation for this area
+        # Fetch daytime (6-18) prices and radiation
+        prices_for_corr = db.query(Price).filter(
+            and_(
+                Price.area == area,
+                Price.timestamp >= start_date,
+                Price.timestamp <= end_date,
+                func.extract('hour', Price.timestamp) >= 6,
+                func.extract('hour', Price.timestamp) <= 18
+            )
+        ).all()
+
+        radiation_for_corr = db.query(Radiation).filter(
+            and_(
+                Radiation.area == area,
+                Radiation.timestamp >= start_date,
+                Radiation.timestamp <= end_date,
+                func.extract('hour', Radiation.timestamp) >= 6,
+                func.extract('hour', Radiation.timestamp) <= 18
+            )
+        ).all()
+
+        correlation = None
+        if prices_for_corr and radiation_for_corr:
+            try:
+                corr_result = compute_correlations(prices_for_corr, radiation_for_corr)
+                correlation = corr_result.get('r_ghi')
+            except:
+                correlation = None
+
+        if price_stats and price_stats.count > 0:
+            area_stats_list.append(AreaStats(
+                area=area,
+                avg_price=round(price_stats.avg_price, 2) if price_stats.avg_price else 0.0,
+                min_price=round(price_stats.min_price, 2) if price_stats.min_price else 0.0,
+                max_price=round(price_stats.max_price, 2) if price_stats.max_price else 0.0,
+                avg_ghi=round(rad_stats.avg_ghi, 2) if rad_stats and rad_stats.avg_ghi else 0.0,
+                correlation=round(correlation, 3) if correlation is not None else None,
+                data_points=price_stats.count
+            ))
+
+    if not area_stats_list:
+        raise HTTPException(
+            status_code=404,
+            detail="No data available for the specified areas"
+        )
+
+    return MultiAreaComparisonResponse(
+        date_range={
+            "from": start_date.isoformat(),
+            "to": end_date.isoformat()
+        },
+        areas=area_stats_list
+    )
 
 @app.post("/api/train", response_model=TrainResponse)
 async def train_model(
