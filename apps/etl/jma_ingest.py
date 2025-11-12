@@ -114,8 +114,14 @@ class JMAIngester:
                 'dhi': hourly.get('diffuse_radiation', []),
             })
 
-            # Filter to requested date range
-            df = df[(df['timestamp'] >= start_date) & (df['timestamp'] <= end_date)]
+            # Ensure timezone awareness (Open-Meteo returns timezone-aware timestamps)
+            if df['timestamp'].dt.tz is None:
+                df['timestamp'] = df['timestamp'].dt.tz_localize('Asia/Tokyo')
+
+            # Filter to requested date range - convert dates to pandas Timestamps for comparison
+            start_ts = pd.Timestamp(start_date)
+            end_ts = pd.Timestamp(end_date)
+            df = df[(df['timestamp'] >= start_ts) & (df['timestamp'] <= end_ts)]
 
             logger.info(f"Fetched {len(df)} hourly records for {area}")
             return df
