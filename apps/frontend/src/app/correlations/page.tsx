@@ -92,6 +92,86 @@ export default function CorrelationsPage() {
         </p>
       </div>
 
+      {/* Key Findings Section - shown after analysis */}
+      {correlation && (
+        <div className="rounded-lg border bg-gradient-to-r from-blue-50 to-indigo-50 dark:from-blue-950 dark:to-indigo-950 p-6">
+          <h2 className="text-xl font-semibold mb-4">Key Findings</h2>
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            <div className="p-4 bg-white dark:bg-slate-900 rounded-lg">
+              <h3 className="text-xs font-medium text-muted-foreground mb-2 uppercase tracking-wide">GHI Correlation</h3>
+              <div className={`text-3xl font-bold ${
+                correlation.r_ghi && Math.abs(correlation.r_ghi) > 0.5 ? 'text-green-600' :
+                correlation.r_ghi && Math.abs(correlation.r_ghi) > 0.3 ? 'text-amber-600' :
+                'text-slate-600'
+              }`}>
+                {correlation.r_ghi?.toFixed(3) || 'N/A'}
+              </div>
+              <p className="text-xs text-muted-foreground mt-2">
+                {correlation.r_ghi && Math.abs(correlation.r_ghi) > 0.5 ? 'Strong correlation' :
+                 correlation.r_ghi && Math.abs(correlation.r_ghi) > 0.3 ? 'Moderate correlation' :
+                 'Weak correlation'}
+              </p>
+            </div>
+
+            <div className="p-4 bg-white dark:bg-slate-900 rounded-lg">
+              <h3 className="text-xs font-medium text-muted-foreground mb-2 uppercase tracking-wide">DNI Correlation</h3>
+              <div className={`text-3xl font-bold ${
+                correlation.r_dni && Math.abs(correlation.r_dni) > 0.5 ? 'text-green-600' :
+                correlation.r_dni && Math.abs(correlation.r_dni) > 0.3 ? 'text-amber-600' :
+                'text-slate-600'
+              }`}>
+                {correlation.r_dni?.toFixed(3) || 'N/A'}
+              </div>
+              <p className="text-xs text-muted-foreground mt-2">
+                Direct Normal Irradiance
+              </p>
+            </div>
+
+            <div className="p-4 bg-white dark:bg-slate-900 rounded-lg">
+              <h3 className="text-xs font-medium text-muted-foreground mb-2 uppercase tracking-wide">DHI Correlation</h3>
+              <div className={`text-3xl font-bold ${
+                correlation.r_dhi && Math.abs(correlation.r_dhi) > 0.5 ? 'text-green-600' :
+                correlation.r_dhi && Math.abs(correlation.r_dhi) > 0.3 ? 'text-amber-600' :
+                'text-slate-600'
+              }`}>
+                {correlation.r_dhi?.toFixed(3) || 'N/A'}
+              </div>
+              <p className="text-xs text-muted-foreground mt-2">
+                Diffuse Horizontal Irradiance
+              </p>
+            </div>
+          </div>
+
+          <div className="mt-4 p-4 bg-white dark:bg-slate-900 rounded-lg">
+            <h3 className="text-sm font-semibold mb-2 uppercase text-xs tracking-wide">Interpretation</h3>
+            <p className="text-sm text-muted-foreground">
+              {correlation.r_ghi && correlation.r_ghi < -0.3 ? (
+                <>
+                  <strong>Negative correlation detected:</strong> In {selectedArea}, higher solar radiation is associated with
+                  lower electricity prices. This suggests that solar power generation effectively reduces spot market prices
+                  during sunny hours by displacing more expensive conventional generation.
+                </>
+              ) : correlation.r_ghi && correlation.r_ghi > 0.3 ? (
+                <>
+                  <strong>Positive correlation detected:</strong> In {selectedArea}, higher solar radiation is associated with
+                  higher electricity prices. This unusual pattern might indicate that solar capacity is limited, or that
+                  demand peaks during sunny periods outweigh solar generation benefits.
+                </>
+              ) : (
+                <>
+                  <strong>Weak correlation:</strong> In {selectedArea}, the relationship between solar radiation and
+                  electricity prices is weak. This might indicate limited solar capacity, complex market dynamics,
+                  or that other factors dominate price formation.
+                </>
+              )}
+            </p>
+            <p className="text-xs text-muted-foreground mt-2">
+              Analysis period: {selectedPeriod} | Data points: {correlation.n} (daytime hours only: 6am-6pm)
+            </p>
+          </div>
+        </div>
+      )}
+
       <div className="rounded-lg border bg-card p-6">
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
           <div>

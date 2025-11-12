@@ -47,15 +47,65 @@ export default function ForecastPage() {
       </div>
 
       {/* Info Alert */}
-      <div className="rounded-lg border border-blue-200 bg-blue-50 dark:bg-blue-950 p-4">
-        <h3 className="text-sm font-medium mb-2 uppercase tracking-wide text-blue-700 dark:text-blue-300">Model Training Required</h3>
-        <p className="text-sm text-muted-foreground mb-2">
-          Before generating forecasts, you need to train an ML model using historical data.
-        </p>
-        <p className="text-xs text-muted-foreground">
-          <strong>How to train:</strong> Use the API endpoint <code className="bg-white dark:bg-slate-800 px-1 py-0.5 rounded">/api/train</code> with your area and features.
-          Models are trained using XGBoost on historical price and solar radiation data.
-        </p>
+      <div className="rounded-lg border border-blue-200 bg-blue-50 dark:bg-blue-950 p-6">
+        <h3 className="text-lg font-semibold mb-3 uppercase text-sm tracking-wide text-blue-700 dark:text-blue-300">ML Model Training Required</h3>
+
+        <div className="space-y-4">
+          <p className="text-sm text-muted-foreground">
+            Price forecasting uses machine learning models trained on historical data. Before generating forecasts,
+            you need to train a model for your selected area.
+          </p>
+
+          <div className="p-4 bg-white dark:bg-slate-900 rounded-lg">
+            <h4 className="text-sm font-semibold mb-2">How to Train a Model</h4>
+            <div className="space-y-2 text-sm text-muted-foreground">
+              <p><strong>Option 1: Using API Directly</strong></p>
+              <pre className="bg-slate-100 dark:bg-slate-800 p-3 rounded text-xs overflow-x-auto">
+{`curl -X POST "http://localhost:8000/api/train" \\
+  -H "Content-Type: application/json" \\
+  -d '{
+    "area": "TOKYO",
+    "target": "area_price",
+    "features": ["ghi", "dni", "dhi", "volume_kwh",
+                 "price_lag_1h", "price_lag_24h",
+                 "hour", "dow", "month"],
+    "val_window": "7d"
+  }'`}
+              </pre>
+
+              <p className="mt-3"><strong>Option 2: Using Python</strong></p>
+              <pre className="bg-slate-100 dark:bg-slate-800 p-3 rounded text-xs overflow-x-auto">
+{`import requests
+
+response = requests.post(
+    "http://localhost:8000/api/train",
+    json={
+        "area": "TOKYO",
+        "target": "area_price",
+        "features": ["ghi", "dni", "dhi", "hour", "dow"],
+        "val_window": "7d"
+    }
+)
+print(response.json())`}
+              </pre>
+            </div>
+          </div>
+
+          <div className="p-4 bg-amber-50 dark:bg-amber-950 rounded-lg">
+            <h4 className="text-sm font-semibold mb-2 text-amber-700 dark:text-amber-300">Requirements</h4>
+            <ul className="text-sm text-muted-foreground space-y-1">
+              <li>• Historical price data (JEPX)</li>
+              <li>• Solar radiation data (Open-Meteo)</li>
+              <li>• ML features built from raw data</li>
+              <li>• At least 30 days of data recommended</li>
+            </ul>
+          </div>
+
+          <p className="text-xs text-muted-foreground">
+            <strong>Note:</strong> Training typically takes 30-60 seconds depending on data volume.
+            The model uses XGBoost algorithm optimized for time-series price prediction.
+          </p>
+        </div>
       </div>
 
       <div className="rounded-lg border bg-card p-6">
