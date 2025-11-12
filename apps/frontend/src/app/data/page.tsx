@@ -3,6 +3,7 @@
 import { useState } from 'react'
 import { api, type PricePoint, type RadiationPoint } from '@/lib/api'
 import { formatDate, formatNumber } from '@/lib/utils'
+import { TimeSeriesChart, MultiSeriesChart } from '@/components/charts'
 
 const AREAS = [
   'HOKKAIDO', 'TOHOKU', 'TOKYO', 'CHUBU', 'HOKURIKU',
@@ -110,12 +111,30 @@ export default function DataPage() {
       )}
 
       {prices.length > 0 && (
-        <div className="rounded-lg border bg-card p-6">
-          <h2 className="text-xl font-semibold mb-4">
-            Price Data - {selectedArea}
-          </h2>
-          <div className="overflow-x-auto">
-            <table className="w-full text-sm">
+        <div className="space-y-6">
+          {/* Price Chart */}
+          <div className="rounded-lg border bg-card p-6">
+            <TimeSeriesChart
+              title={`Electricity Prices - ${selectedArea}`}
+              data={prices.map((p) => ({
+                timestamp: p.timestamp,
+                value: p.price_jpy_kwh,
+              }))}
+              yAxisLabel="Price (JPY/kWh)"
+              height={400}
+            />
+            <p className="text-sm text-muted-foreground mt-4 text-center">
+              Interactive chart: Zoom in/out, pan to explore price trends over time
+            </p>
+          </div>
+
+          {/* Price Table */}
+          <div className="rounded-lg border bg-card p-6">
+            <h2 className="text-xl font-semibold mb-4">
+              Price Data - {selectedArea}
+            </h2>
+            <div className="overflow-x-auto">
+              <table className="w-full text-sm">
               <thead>
                 <tr className="border-b">
                   <th className="text-left p-2">Timestamp (JST)</th>
@@ -145,16 +164,57 @@ export default function DataPage() {
               Showing first 100 of {prices.length} records. Export to view all.
             </p>
           )}
+          </div>
         </div>
       )}
 
       {radiation.length > 0 && (
-        <div className="rounded-lg border bg-card p-6">
-          <h2 className="text-xl font-semibold mb-4">
-            Radiation Data - {selectedArea}
-          </h2>
-          <div className="overflow-x-auto">
-            <table className="w-full text-sm">
+        <div className="space-y-6">
+          {/* Radiation Chart */}
+          <div className="rounded-lg border bg-card p-6">
+            <MultiSeriesChart
+              title={`Solar Radiation - ${selectedArea}`}
+              series={[
+                {
+                  name: 'GHI (Global)',
+                  data: radiation.map((r) => ({
+                    timestamp: r.timestamp,
+                    value: r.ghi || 0,
+                  })),
+                  color: '#f59e0b', // amber
+                },
+                {
+                  name: 'DNI (Direct)',
+                  data: radiation.map((r) => ({
+                    timestamp: r.timestamp,
+                    value: r.dni || 0,
+                  })),
+                  color: '#ef4444', // red
+                },
+                {
+                  name: 'DHI (Diffuse)',
+                  data: radiation.map((r) => ({
+                    timestamp: r.timestamp,
+                    value: r.dhi || 0,
+                  })),
+                  color: '#3b82f6', // blue
+                },
+              ]}
+              yAxisLabel="Radiation (W/m²)"
+              height={400}
+            />
+            <p className="text-sm text-muted-foreground mt-4 text-center">
+              GHI = Total solar radiation | DNI = Direct sunlight | DHI = Scattered/cloud-filtered light
+            </p>
+          </div>
+
+          {/* Radiation Table */}
+          <div className="rounded-lg border bg-card p-6">
+            <h2 className="text-xl font-semibold mb-4">
+              Radiation Data - {selectedArea}
+            </h2>
+            <div className="overflow-x-auto">
+              <table className="w-full text-sm">
               <thead>
                 <tr className="border-b">
                   <th className="text-left p-2">Timestamp (JST)</th>
@@ -189,6 +249,7 @@ export default function DataPage() {
               all.
             </p>
           )}
+          </div>
         </div>
       )}
     </div>
