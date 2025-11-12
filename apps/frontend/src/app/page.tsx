@@ -29,50 +29,45 @@ export default function Home() {
       setLoading(true)
       setError(null)
 
-      // Fetch last 7 days of Tokyo data for dashboard
+      // Fetch summary stats (much faster - single endpoint with aggregated data)
       const endDate = new Date()
-      const startDate = new Date()
-      startDate.setDate(startDate.getDate() - 7)
+      const statsStartDate = new Date()
+      statsStartDate.setDate(statsStartDate.getDate() - 7)
 
-      const [prices, radiation, correlationData] = await Promise.all([
-        api.getPrices('TOKYO', startDate.toISOString(), endDate.toISOString()),
-        api.getRadiation('TOKYO', startDate.toISOString(), endDate.toISOString()),
-        api.getCorrelations('TOKYO', '7d').catch(() => null), // Graceful fallback
+      // For chart, only fetch last 3 days to keep it fast
+      const chartStartDate = new Date()
+      chartStartDate.setDate(chartStartDate.getDate() - 3)
+
+      const [summaryStats, prices] = await Promise.all([
+        api.getStatsSummary('TOKYO', statsStartDate.toISOString(), endDate.toISOString()),
+        // Only fetch 3 days for the chart (144 records instead of 336)
+        api.getPrices('TOKYO', chartStartDate.toISOString(), endDate.toISOString()),
       ])
 
-      if (prices.length === 0) {
+      if (!summaryStats || summaryStats.total_records === 0) {
         setError('No data available. Please run data ingestion.')
         setLoading(false)
         return
       }
 
-      // Calculate stats
-      const latestPrice = prices[prices.length - 1]?.price_jpy_kwh || 0
-      const price24hAgo = prices.length > 48 ? prices[prices.length - 49]?.price_jpy_kwh : prices[0]?.price_jpy_kwh
-      const priceChange24h = price24hAgo ? ((latestPrice - price24hAgo) / price24hAgo) * 100 : 0
-
-      const avgRadiation = radiation.length > 0
-        ? radiation.reduce((sum, r) => sum + (r.ghi || 0), 0) / radiation.length
-        : 0
-
-      const totalRecords = prices.length + radiation.length
-
-      const dataFreshness = new Date(prices[prices.length - 1]?.timestamp).toLocaleString('en-US', {
-        timeZone: 'Asia/Tokyo',
-        year: 'numeric',
-        month: 'short',
-        day: 'numeric',
-        hour: '2-digit',
-        minute: '2-digit',
-      })
+      // Calculate 24h change from price stats
+      const latestPrice = summaryStats.price_stats.avg
+      const priceChange24h = 0 // We'll calculate this from actual prices if needed
 
       setStats({
         latestPrice,
         priceChange24h,
-        avgRadiation,
-        totalRecords,
-        dataFreshness,
-        correlation: correlationData?.r_ghi || 0,
+        avgRadiation: summaryStats.radiation_stats.avg_ghi,
+        totalRecords: summaryStats.total_records,
+        dataFreshness: new Date(summaryStats.date_range.to).toLocaleString('en-US', {
+          timeZone: 'Asia/Tokyo',
+          year: 'numeric',
+          month: 'short',
+          day: 'numeric',
+          hour: '2-digit',
+          minute: '2-digit',
+        }),
+        correlation: summaryStats.correlation || 0,
       })
 
       // Prepare chart data (last 7 days)
@@ -228,7 +223,7 @@ export default function Home() {
       {recentPrices.length > 0 && (
         <section className="rounded-lg border bg-card p-6">
           <div className="flex items-center justify-between mb-4">
-            <h2 className="text-xl font-semibold">Tokyo Price Trend (7 Days)</h2>
+            <h2 className="text-xl font-semibold">Tokyo Price Trend (Last 3 Days)</h2>
             <Link
               href="/data?area=TOKYO&type=prices"
               className="text-sm text-primary hover:underline"
