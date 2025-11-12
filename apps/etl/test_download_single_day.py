@@ -159,29 +159,61 @@ def download_openmeteo_day(date: datetime, area: str = "TOKYO") -> bool:
         logger.error(f"✗ FAILED: {type(e).__name__}: {e}")
         return False
 
-def check_jepx_availability() -> bool:
-    """Check if JEPX data is accessible (usually returns 403)"""
+def download_jepx_year(year: int = 2025) -> bool:
+    """Download JEPX full year data (if accessible via HTTP)"""
     logger.info(f"\n{'='*60}")
-    logger.info(f"JEPX: Checking data availability")
+    logger.info(f"JEPX: Downloading full year {year} data")
     logger.info(f"{'='*60}")
 
     import httpx
 
     urls = [
-        "https://www.jepx.jp/market/excel/spot_2025.csv",
-        "https://www.jepx.jp/market/excel/spot_summary_2025.csv",
-        "https://www.jepx.jp/market/excel/spot_2024.csv",
+        ("spot", f"https://www.jepx.jp/market/excel/spot_{year}.csv"),
+        ("summary", f"https://www.jepx.jp/market/excel/spot_summary_{year}.csv"),
     ]
 
-    for url in urls:
-        logger.info(f"\nTrying: {url}")
+    for file_type, url in urls:
+        logger.info(f"\nTrying {file_type}: {url}")
         try:
-            response = httpx.get(url, timeout=5, follow_redirects=True)
+            response = httpx.get(url, timeout=30, follow_redirects=True)
 
             if response.status_code == 200:
-                logger.info(f"  ✓ Available! (200 OK, {len(response.content)} bytes)")
-                logger.info(f"  Direct HTTP works - no Playwright needed!")
+                content = response.content
+
+                # Check if it's actually CSV data (not error page)
+                if len(content) < 1000:
+                    logger.info(f"  ✗ Response too small ({len(content)} bytes) - probably error page")
+                    try:
+                        error_msg = content.decode('utf-8', errors='ignore')
+                        logger.info(f"  Content: {error_msg}")
+                    except:
+                        pass
+                    continue
+
+                logger.info(f"  ✓ Available! (200 OK, {len(content):,} bytes)")
+
+                # Save file
+                output_dir = Path('data/jepx')
+                output_dir.mkdir(parents=True, exist_ok=True)
+                output_file = output_dir / f"spot_{year}.csv" if file_type == "spot" else output_dir / f"spot_summary_{year}.csv"
+
+                with open(output_file, 'wb') as f:
+                    f.write(content)
+
+                logger.info(f"  ✓ Saved to: {output_file}")
+
+                # Show preview
+                try:
+                    with open(output_file, 'r', encoding='cp932') as f:
+                        lines = f.readlines()[:5]
+                        logger.info(f"  Preview (first 5 lines):")
+                        for line in lines:
+                            logger.info(f"    {line.strip()[:100]}")
+                except Exception as e:
+                    logger.info(f"  (Could not preview: {e})")
+
                 return True
+
             elif response.status_code == 403:
                 logger.info(f"  ✗ 403 Forbidden - Playwright required")
             elif response.status_code == 404:
@@ -190,11 +222,11 @@ def check_jepx_availability() -> bool:
                 logger.info(f"  ? HTTP {response.status_code}")
 
         except Exception as e:
-            logger.info(f"  ✗ Error: {type(e).__name__}")
+            logger.info(f"  ✗ Error: {type(e).__name__}: {str(e)[:100]}")
 
         time.sleep(0.5)
 
-    logger.info(f"\n→ JEPX requires Playwright automation")
+    logger.info(f"\n→ JEPX not accessible via direct HTTP")
     logger.info(f"  Run: make download-jepx-playwright")
     return False
 
@@ -252,8 +284,8 @@ def main():
     # Test 2: Open-Meteo (API)
     results['Open-Meteo'] = download_openmeteo_day(test_date, args.area)
 
-    # Test 3: JEPX availability check
-    results['JEPX'] = check_jepx_availability()
+    # Test 3: JEPX download (full year)
+    results['JEPX'] = download_jepx_year(year=test_date.year)
 
     # Summary
     logger.info(f"\n{'='*60}")
@@ -285,9 +317,13 @@ def main():
         logger.info("✗ Open-Meteo download failed")
         logger.info("  Check API availability and network")
 
-    if not results['JEPX']:
-        logger.info("⚠ JEPX requires Playwright automation")
-        logger.info("  Direct HTTP blocked with 403 Forbidden")
+    if results['JEPX']:
+        logger.info("✓ JEPX data downloaded via direct HTTP!")
+        logger.info(f"  File: data/jepx/spot_{test_date.year}.csv")
+        logger.info("  Direct HTTP works - no Playwright needed!")
+    else:
+        logger.info("⚠ JEPX download failed")
+        logger.info("  Direct HTTP blocked - need Playwright")
         logger.info("  Run: make download-jepx-playwright")
 
     logger.info(f"{'='*60}")
@@ -295,20 +331,29 @@ def main():
     # Next steps
     logger.info("\nNEXT STEPS:")
 
-    if results['TEPCO'] and results['Open-Meteo']:
-        logger.info("✓ Basic data collection works!")
-        logger.info("\n1. Import TEPCO data:")
-        logger.info(f"   docker-compose exec api python /etl/tepco_demand_ingest.py \\")
-        logger.info(f"     --file /app/data/tepco/juyo-{test_date.strftime('%Y%m%d')}.csv")
+    if any(results.values()):
+        logger.info("✓ At least one data source works!")
 
-        logger.info("\n2. Download JEPX with Playwright:")
-        logger.info("   make download-jepx-playwright")
+        if results['TEPCO']:
+            logger.info("\n1. Import TEPCO data:")
+            logger.info(f"   docker-compose exec api python /etl/tepco_demand_ingest.py \\")
+            logger.info(f"     --file /app/data/tepco/juyo-{test_date.strftime('%Y%m%d')}.csv")
 
-        logger.info("\n3. Build features:")
-        logger.info("   docker-compose exec api python /etl/build_features.py \\")
-        logger.info(f"     --areas {args.area} \\")
-        logger.info(f"     --start-date {test_date.strftime('%Y-%m-%d')} \\")
-        logger.info(f"     --end-date {test_date.strftime('%Y-%m-%d')}")
+        if results['JEPX']:
+            logger.info("\n2. Import JEPX data:")
+            logger.info(f"   docker-compose exec api python /etl/import_jepx_csv.py \\")
+            logger.info(f"     --file /app/data/jepx/spot_{test_date.year}.csv \\")
+            logger.info(f"     --areas {args.area}")
+        else:
+            logger.info("\n2. Download JEPX with Playwright:")
+            logger.info("   make download-jepx-playwright")
+
+        if results['TEPCO'] and results['JEPX']:
+            logger.info("\n3. Build features:")
+            logger.info("   docker-compose exec api python /etl/build_features.py \\")
+            logger.info(f"     --areas {args.area} \\")
+            logger.info(f"     --start-date {test_date.strftime('%Y-%m-%d')} \\")
+            logger.info(f"     --end-date {test_date.strftime('%Y-%m-%d')}")
     else:
         logger.info("⚠ Some downloads failed - check errors above")
         logger.info("\nTry:")
