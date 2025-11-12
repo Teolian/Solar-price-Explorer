@@ -92,6 +92,16 @@ class MultiAreaComparisonResponse(BaseModel):
     date_range: dict
     areas: List[AreaStats]
 
+class StatsSummary(BaseModel):
+    area: str
+    date_range: dict
+    price_stats: dict
+    radiation_stats: dict
+    correlation: Optional[float] = None
+    top_expensive_hours: List[dict]
+    top_cheap_hours: List[dict]
+    total_records: int
+
 class TrainRequest(BaseModel):
     area: str
     target: str = "area_price"
@@ -440,6 +450,158 @@ async def get_multi_area_comparison(
             "to": end_date.isoformat()
         },
         areas=area_stats_list
+    )
+
+@app.get("/api/stats/summary", response_model=StatsSummary)
+async def get_stats_summary(
+    area: str = Query(..., description="Area code (e.g., TOKYO, HOKKAIDO)"),
+    from_date: Optional[str] = Query(None, description="Start date (ISO format)"),
+    to_date: Optional[str] = Query(None, description="End date (ISO format)"),
+    db: Session = Depends(get_db)
+):
+    """
+    Get comprehensive statistical summary for an area including:
+    - Price statistics (avg, min, max, std dev)
+    - Solar radiation statistics
+    - Correlation metrics
+    - Top 10 most expensive and cheapest hours
+    - Total record counts
+    """
+    # Parse dates - default to last 30 days
+    if from_date and to_date:
+        start_date = datetime.fromisoformat(from_date.replace('Z', '+00:00'))
+        end_date = datetime.fromisoformat(to_date.replace('Z', '+00:00'))
+    else:
+        end_date = datetime.now(JST)
+        start_date = end_date - timedelta(days=30)
+
+    # Fetch price statistics
+    from sqlalchemy import func as sql_func
+
+    price_stats_query = db.query(
+        sql_func.avg(Price.area_price_jpy_kwh).label('avg_price'),
+        sql_func.min(Price.area_price_jpy_kwh).label('min_price'),
+        sql_func.max(Price.area_price_jpy_kwh).label('max_price'),
+        sql_func.stddev(Price.area_price_jpy_kwh).label('std_price'),
+        sql_func.count(Price.id).label('count')
+    ).filter(
+        and_(
+            Price.area == area.upper(),
+            Price.timestamp >= start_date,
+            Price.timestamp <= end_date
+        )
+    ).first()
+
+    if not price_stats_query or not price_stats_query.count:
+        raise HTTPException(
+            status_code=404,
+            detail=f"No price data available for {area} in the specified date range"
+        )
+
+    # Fetch radiation statistics
+    rad_stats_query = db.query(
+        sql_func.avg(Radiation.ghi).label('avg_ghi'),
+        sql_func.min(Radiation.ghi).label('min_ghi'),
+        sql_func.max(Radiation.ghi).label('max_ghi'),
+        sql_func.avg(Radiation.dni).label('avg_dni'),
+        sql_func.avg(Radiation.dhi).label('avg_dhi'),
+        sql_func.count(Radiation.id).label('count')
+    ).filter(
+        and_(
+            Radiation.area == area.upper(),
+            Radiation.timestamp >= start_date,
+            Radiation.timestamp <= end_date
+        )
+    ).first()
+
+    # Calculate correlation (daytime hours only)
+    prices_for_corr = db.query(Price).filter(
+        and_(
+            Price.area == area.upper(),
+            Price.timestamp >= start_date,
+            Price.timestamp <= end_date,
+            sql_func.extract('hour', Price.timestamp) >= 6,
+            sql_func.extract('hour', Price.timestamp) <= 18
+        )
+    ).all()
+
+    radiation_for_corr = db.query(Radiation).filter(
+        and_(
+            Radiation.area == area.upper(),
+            Radiation.timestamp >= start_date,
+            Radiation.timestamp <= end_date,
+            sql_func.extract('hour', Radiation.timestamp) >= 6,
+            sql_func.extract('hour', Radiation.timestamp) <= 18
+        )
+    ).all()
+
+    correlation = None
+    if prices_for_corr and radiation_for_corr:
+        try:
+            corr_result = compute_correlations(prices_for_corr, radiation_for_corr)
+            correlation = corr_result.get('r_ghi')
+        except:
+            correlation = None
+
+    # Get top 10 most expensive hours
+    top_expensive = db.query(
+        Price.timestamp,
+        Price.area_price_jpy_kwh
+    ).filter(
+        and_(
+            Price.area == area.upper(),
+            Price.timestamp >= start_date,
+            Price.timestamp <= end_date
+        )
+    ).order_by(Price.area_price_jpy_kwh.desc()).limit(10).all()
+
+    # Get top 10 cheapest hours
+    top_cheap = db.query(
+        Price.timestamp,
+        Price.area_price_jpy_kwh
+    ).filter(
+        and_(
+            Price.area == area.upper(),
+            Price.timestamp >= start_date,
+            Price.timestamp <= end_date
+        )
+    ).order_by(Price.area_price_jpy_kwh.asc()).limit(10).all()
+
+    return StatsSummary(
+        area=area.upper(),
+        date_range={
+            "from": start_date.isoformat(),
+            "to": end_date.isoformat()
+        },
+        price_stats={
+            "avg": round(price_stats_query.avg_price, 2) if price_stats_query.avg_price else 0.0,
+            "min": round(price_stats_query.min_price, 2) if price_stats_query.min_price else 0.0,
+            "max": round(price_stats_query.max_price, 2) if price_stats_query.max_price else 0.0,
+            "std": round(price_stats_query.std_price, 2) if price_stats_query.std_price else 0.0,
+        },
+        radiation_stats={
+            "avg_ghi": round(rad_stats_query.avg_ghi, 2) if rad_stats_query and rad_stats_query.avg_ghi else 0.0,
+            "min_ghi": round(rad_stats_query.min_ghi, 2) if rad_stats_query and rad_stats_query.min_ghi else 0.0,
+            "max_ghi": round(rad_stats_query.max_ghi, 2) if rad_stats_query and rad_stats_query.max_ghi else 0.0,
+            "avg_dni": round(rad_stats_query.avg_dni, 2) if rad_stats_query and rad_stats_query.avg_dni else 0.0,
+            "avg_dhi": round(rad_stats_query.avg_dhi, 2) if rad_stats_query and rad_stats_query.avg_dhi else 0.0,
+        },
+        correlation=round(correlation, 3) if correlation is not None else None,
+        top_expensive_hours=[
+            {
+                "timestamp": t.timestamp.isoformat(),
+                "price": round(t.area_price_jpy_kwh, 2)
+            }
+            for t in top_expensive
+        ],
+        top_cheap_hours=[
+            {
+                "timestamp": t.timestamp.isoformat(),
+                "price": round(t.area_price_jpy_kwh, 2)
+            }
+            for t in top_cheap
+        ],
+        total_records=price_stats_query.count
     )
 
 @app.post("/api/train", response_model=TrainResponse)

@@ -78,6 +78,37 @@ export interface MultiAreaComparisonResponse {
   areas: AreaStats[]
 }
 
+export interface StatsSummary {
+  area: string
+  date_range: {
+    from: string
+    to: string
+  }
+  price_stats: {
+    avg: number
+    min: number
+    max: number
+    std: number
+  }
+  radiation_stats: {
+    avg_ghi: number
+    min_ghi: number
+    max_ghi: number
+    avg_dni: number
+    avg_dhi: number
+  }
+  correlation?: number
+  top_expensive_hours: Array<{
+    timestamp: string
+    price: number
+  }>
+  top_cheap_hours: Array<{
+    timestamp: string
+    price: number
+  }>
+  total_records: number
+}
+
 export const api = {
   async getAreas(): Promise<Area> {
     const res = await fetch(`${API_BASE}/api/areas`)
@@ -163,6 +194,20 @@ export const api = {
 
     const res = await fetch(`${API_BASE}/api/stats/multi-area-comparison?${params}`)
     if (!res.ok) throw new Error('Failed to fetch multi-area comparison')
+    return res.json()
+  },
+
+  async getStatsSummary(
+    area: string,
+    from?: string,
+    to?: string
+  ): Promise<StatsSummary> {
+    const params = new URLSearchParams({ area })
+    if (from) params.append('from_date', from)
+    if (to) params.append('to_date', to)
+
+    const res = await fetch(`${API_BASE}/api/stats/summary?${params}`)
+    if (!res.ok) throw new Error('Failed to fetch stats summary')
     return res.json()
   },
 }
