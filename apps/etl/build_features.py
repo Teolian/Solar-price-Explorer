@@ -175,14 +175,12 @@ class FeatureBuilder:
             logger.error(f"Error storing features: {e}")
             raise
 
-    def run(self, areas: List[str], days: int = 7):
+    def run(self, areas: List[str], start_date: datetime, end_date: datetime):
         """
         Build features for specified areas
         """
         logger.info(f"Building features for areas: {areas}")
-
-        end_date = datetime.now(JST)
-        start_date = end_date - timedelta(days=days)
+        logger.info(f"Date range: {start_date.date()} to {end_date.date()}")
 
         for area in areas:
             try:
@@ -225,16 +223,17 @@ def main():
 
     # Parse date range
     if args.start_date and args.end_date:
-        # Use explicit date range (not used in run(), but for clarity)
+        start_date = datetime.strptime(args.start_date, '%Y-%m-%d').replace(tzinfo=JST)
+        end_date = datetime.strptime(args.end_date, '%Y-%m-%d').replace(tzinfo=JST)
         logger.info(f"Building features from {args.start_date} to {args.end_date}")
-        days = (datetime.strptime(args.end_date, '%Y-%m-%d') -
-                datetime.strptime(args.start_date, '%Y-%m-%d')).days
     else:
-        days = args.days
+        end_date = datetime.now(JST).replace(hour=23, minute=59, second=59)
+        start_date = end_date - timedelta(days=args.days)
+        logger.info(f"Building features for last {args.days} days")
 
     # Run feature building
     builder = FeatureBuilder(database_url)
-    builder.run(areas, args.days)
+    builder.run(areas, start_date, end_date)
 
 if __name__ == '__main__':
     main()
