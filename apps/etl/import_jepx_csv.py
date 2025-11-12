@@ -171,7 +171,7 @@ def store_prices(df: pd.DataFrame, database_url: str):
     with engine.begin() as conn:
         for _, row in df.iterrows():
             conn.execute(text("""
-                INSERT INTO jepx_prices
+                INSERT INTO prices
                 (timestamp, area, area_price_jpy_kwh, system_price_jpy_kwh,
                  volume_total_kwh, volume_sell_kwh, volume_buy_kwh)
                 VALUES (:timestamp, :area, :area_price, :system_price, NULL, NULL, NULL)
