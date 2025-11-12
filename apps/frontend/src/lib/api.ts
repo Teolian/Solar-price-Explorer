@@ -109,6 +109,36 @@ export interface StatsSummary {
   total_records: number
 }
 
+export interface ConsumptionScenario {
+  daily_consumption_kwh: number
+  monthly_savings_jpy: number
+  annual_savings_jpy: number
+}
+
+export interface SavingsAnalysis {
+  peak_price_avg: number
+  solar_price_avg: number
+  price_difference: number
+  savings_percentage: number
+  best_hours: number[]
+  worst_hours: number[]
+  example_scenarios: {
+    small_business: ConsumptionScenario
+    medium_factory: ConsumptionScenario
+    large_factory: ConsumptionScenario
+  }
+}
+
+export interface SavingsPotentialResponse {
+  area: string
+  period: string
+  date_range: {
+    from: string
+    to: string
+  }
+  savings_analysis: SavingsAnalysis
+}
+
 export const api = {
   async getAreas(): Promise<Area> {
     const res = await fetch(`${API_BASE}/api/areas`)
@@ -208,6 +238,20 @@ export const api = {
 
     const res = await fetch(`${API_BASE}/api/stats/summary?${params}`)
     if (!res.ok) throw new Error('Failed to fetch stats summary')
+    return res.json()
+  },
+
+  async getSavingsPotential(
+    area: string,
+    from?: string,
+    to?: string
+  ): Promise<SavingsPotentialResponse> {
+    const params = new URLSearchParams({ area })
+    if (from) params.append('from_date', from)
+    if (to) params.append('to_date', to)
+
+    const res = await fetch(`${API_BASE}/api/stats/savings-potential?${params}`)
+    if (!res.ok) throw new Error('Failed to fetch savings potential')
     return res.json()
   },
 }

@@ -102,6 +102,26 @@ class StatsSummary(BaseModel):
     top_cheap_hours: List[dict]
     total_records: int
 
+class ConsumptionScenario(BaseModel):
+    daily_consumption_kwh: float
+    monthly_savings_jpy: float
+    annual_savings_jpy: float
+
+class SavingsAnalysis(BaseModel):
+    peak_price_avg: float
+    solar_price_avg: float
+    price_difference: float
+    savings_percentage: float
+    best_hours: List[int]
+    worst_hours: List[int]
+    example_scenarios: dict
+
+class SavingsPotentialResponse(BaseModel):
+    area: str
+    period: str
+    date_range: dict
+    savings_analysis: SavingsAnalysis
+
 class TrainRequest(BaseModel):
     area: str
     target: str = "area_price"
@@ -602,6 +622,121 @@ async def get_stats_summary(
             for t in top_cheap
         ],
         total_records=price_stats_query.count
+    )
+
+@app.get("/api/stats/savings-potential", response_model=SavingsPotentialResponse)
+async def get_savings_potential(
+    area: str = Query(..., description="Area code (e.g., TOKYO)"),
+    from_date: Optional[str] = Query(None, description="Start date (ISO format)"),
+    to_date: Optional[str] = Query(None, description="End date (ISO format)"),
+    db: Session = Depends(get_db)
+):
+    """
+    Calculate potential savings by shifting energy consumption from peak to solar hours.
+    Returns average prices during peak vs solar hours, savings percentage, and example scenarios.
+    """
+    # Parse dates - default to last 30 days
+    if from_date and to_date:
+        start_date = datetime.fromisoformat(from_date.replace('Z', '+00:00'))
+        end_date = datetime.fromisoformat(to_date.replace('Z', '+00:00'))
+    else:
+        end_date = datetime.now(JST)
+        start_date = end_date - timedelta(days=30)
+
+    # Define peak hours (morning/evening high demand) and solar hours (midday low prices)
+    peak_hours = [7, 8, 9, 18, 19, 20]  # Morning and evening peaks
+    solar_hours = [10, 11, 12, 13, 14]  # Midday solar generation hours
+
+    # Calculate average price during peak hours
+    peak_prices = db.query(
+        func.avg(Price.area_price_jpy_kwh).label('avg_price')
+    ).filter(
+        and_(
+            Price.area == area.upper(),
+            Price.timestamp >= start_date,
+            Price.timestamp <= end_date,
+            func.extract('hour', Price.timestamp).in_(peak_hours)
+        )
+    ).first()
+
+    # Calculate average price during solar hours
+    solar_prices = db.query(
+        func.avg(Price.area_price_jpy_kwh).label('avg_price')
+    ).filter(
+        and_(
+            Price.area == area.upper(),
+            Price.timestamp >= start_date,
+            Price.timestamp <= end_date,
+            func.extract('hour', Price.timestamp).in_(solar_hours)
+        )
+    ).first()
+
+    if not peak_prices or not solar_prices or not peak_prices.avg_price or not solar_prices.avg_price:
+        raise HTTPException(
+            status_code=404,
+            detail=f"Insufficient price data for {area}"
+        )
+
+    peak_avg = round(peak_prices.avg_price, 2)
+    solar_avg = round(solar_prices.avg_price, 2)
+    price_diff = round(peak_avg - solar_avg, 2)
+    savings_pct = round((price_diff / peak_avg) * 100, 1) if peak_avg > 0 else 0.0
+
+    # Calculate example scenarios for different consumption levels
+    # Assuming 30% of consumption can be shifted to solar hours
+    shift_percentage = 0.30
+    days_per_month = 30
+
+    scenarios = {
+        "small_business": {
+            "daily_consumption_kwh": 100,
+            "monthly_savings_jpy": round(100 * shift_percentage * price_diff * days_per_month, 0),
+            "annual_savings_jpy": round(100 * shift_percentage * price_diff * 365, 0)
+        },
+        "medium_factory": {
+            "daily_consumption_kwh": 1000,
+            "monthly_savings_jpy": round(1000 * shift_percentage * price_diff * days_per_month, 0),
+            "annual_savings_jpy": round(1000 * shift_percentage * price_diff * 365, 0)
+        },
+        "large_factory": {
+            "daily_consumption_kwh": 5000,
+            "monthly_savings_jpy": round(5000 * shift_percentage * price_diff * days_per_month, 0),
+            "annual_savings_jpy": round(5000 * shift_percentage * price_diff * 365, 0)
+        }
+    }
+
+    # Find the best and worst hours by average price
+    hourly_avgs = db.query(
+        func.extract('hour', Price.timestamp).label('hour'),
+        func.avg(Price.area_price_jpy_kwh).label('avg_price')
+    ).filter(
+        and_(
+            Price.area == area.upper(),
+            Price.timestamp >= start_date,
+            Price.timestamp <= end_date
+        )
+    ).group_by(func.extract('hour', Price.timestamp)).all()
+
+    sorted_hours = sorted(hourly_avgs, key=lambda x: x.avg_price)
+    best_hours = [int(h.hour) for h in sorted_hours[:5]]  # Top 5 cheapest
+    worst_hours = [int(h.hour) for h in sorted_hours[-5:]]  # Top 5 most expensive
+
+    return SavingsPotentialResponse(
+        area=area.upper(),
+        period="30d",
+        date_range={
+            "from": start_date.isoformat(),
+            "to": end_date.isoformat()
+        },
+        savings_analysis=SavingsAnalysis(
+            peak_price_avg=peak_avg,
+            solar_price_avg=solar_avg,
+            price_difference=price_diff,
+            savings_percentage=savings_pct,
+            best_hours=sorted(best_hours),
+            worst_hours=sorted(worst_hours),
+            example_scenarios=scenarios
+        )
     )
 
 @app.post("/api/train", response_model=TrainResponse)

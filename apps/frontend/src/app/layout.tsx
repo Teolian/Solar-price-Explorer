@@ -42,6 +42,14 @@ export default function RootLayout({
                 </li>
                 <li>
                   <Link
+                    href="/business"
+                    className="hover:text-primary transition-colors font-semibold"
+                  >
+                    Business Value
+                  </Link>
+                </li>
+                <li>
+                  <Link
                     href="/insights"
                     className="hover:text-primary transition-colors"
                   >
