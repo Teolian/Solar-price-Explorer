@@ -4,6 +4,7 @@ import { useState, useEffect } from 'react'
 import Link from 'next/link'
 import { api } from '@/lib/api'
 import { TimeSeriesChart } from '@/components/charts'
+import { useI18n } from '@/lib/i18n'
 
 interface DashboardStats {
   latestPrice: number
@@ -15,6 +16,7 @@ interface DashboardStats {
 }
 
 export default function Home() {
+  const { t } = useI18n()
   const [stats, setStats] = useState<DashboardStats | null>(null)
   const [recentPrices, setRecentPrices] = useState<Array<{ timestamp: string; value: number }>>([])
   const [loading, setLoading] = useState(true)
@@ -89,7 +91,7 @@ export default function Home() {
       <div className="flex items-center justify-center h-96">
         <div className="text-center">
           <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary mx-auto mb-4"></div>
-          <p className="text-muted-foreground">Loading dashboard...</p>
+          <p className="text-muted-foreground">{t('common.loading')}</p>
         </div>
       </div>
     )
@@ -125,7 +127,7 @@ export default function Home() {
       <section className="rounded-lg border bg-gradient-to-r from-blue-50 to-indigo-50 dark:from-blue-950 dark:to-indigo-950 p-6">
         <h1 className="text-3xl font-bold mb-2">Solar×Price Explorer</h1>
         <p className="text-muted-foreground">
-          Real-time analysis of solar radiation impact on Japanese electricity spot prices
+          {t('overview.title')}
         </p>
         <p className="text-xs text-muted-foreground mt-2">
           Data updated: {stats?.dataFreshness} JST
@@ -137,7 +139,7 @@ export default function Home() {
         {/* Latest Price */}
         <div className="rounded-lg border bg-card p-6">
           <div className="flex items-center justify-between mb-2">
-            <h3 className="text-sm font-medium text-muted-foreground">Tokyo Spot Price</h3>
+            <h3 className="text-sm font-medium text-muted-foreground">{t('overview.latest_price')}</h3>
             <span className="text-xs text-muted-foreground">Latest</span>
           </div>
           <div className="text-3xl font-bold">{stats?.latestPrice.toFixed(2)}</div>
@@ -160,11 +162,11 @@ export default function Home() {
         {/* Solar Radiation */}
         <div className="rounded-lg border bg-card p-6">
           <div className="flex items-center justify-between mb-2">
-            <h3 className="text-sm font-medium text-muted-foreground">Solar Radiation</h3>
+            <h3 className="text-sm font-medium text-muted-foreground">{t('overview.avg_radiation')}</h3>
             <span className="text-xs text-muted-foreground">7d avg</span>
           </div>
           <div className="text-3xl font-bold">{stats?.avgRadiation.toFixed(0)}</div>
-          <div className="text-sm text-muted-foreground">W/m² (GHI)</div>
+          <div className="text-sm text-muted-foreground">{t('overview.ghi')}</div>
           <div className="mt-2">
             <div className="flex items-center">
               <div className="flex-1 h-2 bg-muted rounded-full overflow-hidden">
@@ -180,7 +182,7 @@ export default function Home() {
         {/* Correlation */}
         <div className="rounded-lg border bg-card p-6">
           <div className="flex items-center justify-between mb-2">
-            <h3 className="text-sm font-medium text-muted-foreground">Sun-Price Correlation</h3>
+            <h3 className="text-sm font-medium text-muted-foreground">{t('overview.correlation')}</h3>
             <span className="text-xs text-muted-foreground">GHI</span>
           </div>
           <div className="text-3xl font-bold">{stats?.correlation.toFixed(3)}</div>

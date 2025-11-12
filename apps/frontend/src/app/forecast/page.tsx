@@ -2,6 +2,7 @@
 
 import { useState } from 'react'
 import { api, type ForecastResponse } from '@/lib/api'
+import { useI18n } from '@/lib/i18n'
 import { MultiSeriesChart } from '@/components/charts'
 import { formatDate } from '@/lib/utils'
 
@@ -18,6 +19,7 @@ const HORIZONS = [
 ]
 
 export default function ForecastPage() {
+  const { t } = useI18n()
   const [selectedArea, setSelectedArea] = useState('TOKYO')
   const [selectedHorizon, setSelectedHorizon] = useState(24)
   const [forecast, setForecast] = useState<ForecastResponse | null>(null)
@@ -40,26 +42,25 @@ export default function ForecastPage() {
   return (
     <div className="space-y-6">
       <div>
-        <h1 className="text-3xl font-bold">Price Forecast</h1>
+        <h1 className="text-3xl font-bold">{t('forecast.title')}</h1>
         <p className="text-muted-foreground">
-          Generate electricity price forecasts using trained ML models
+          {t('forecast.subtitle')}
         </p>
       </div>
 
       {/* Info Alert */}
       <div className="rounded-lg border border-blue-200 bg-blue-50 dark:bg-blue-950 p-6">
-        <h3 className="text-lg font-semibold mb-3 uppercase text-sm tracking-wide text-blue-700 dark:text-blue-300">ML Model Training Required</h3>
+        <h3 className="text-lg font-semibold mb-3 uppercase text-sm tracking-wide text-blue-700 dark:text-blue-300">{t('forecast.training_required')}</h3>
 
         <div className="space-y-4">
           <p className="text-sm text-muted-foreground">
-            Price forecasting uses machine learning models trained on historical data. Before generating forecasts,
-            you need to train a model for your selected area.
+            {t('forecast.training_desc')}
           </p>
 
           <div className="p-4 bg-white dark:bg-slate-900 rounded-lg">
-            <h4 className="text-sm font-semibold mb-2">How to Train a Model</h4>
+            <h4 className="text-sm font-semibold mb-2">{t('forecast.how_to_train')}</h4>
             <div className="space-y-2 text-sm text-muted-foreground">
-              <p><strong>Option 1: Using API Directly</strong></p>
+              <p><strong>{t('forecast.option_api')}</strong></p>
               <pre className="bg-slate-100 dark:bg-slate-800 p-3 rounded text-xs overflow-x-auto">
 {`curl -X POST "http://localhost:8000/api/train" \\
   -H "Content-Type: application/json" \\
@@ -73,7 +74,7 @@ export default function ForecastPage() {
   }'`}
               </pre>
 
-              <p className="mt-3"><strong>Option 2: Using Python</strong></p>
+              <p className="mt-3"><strong>{t('forecast.option_python')}</strong></p>
               <pre className="bg-slate-100 dark:bg-slate-800 p-3 rounded text-xs overflow-x-auto">
 {`import requests
 
@@ -92,18 +93,17 @@ print(response.json())`}
           </div>
 
           <div className="p-4 bg-amber-50 dark:bg-amber-950 rounded-lg">
-            <h4 className="text-sm font-semibold mb-2 text-amber-700 dark:text-amber-300">Requirements</h4>
+            <h4 className="text-sm font-semibold mb-2 text-amber-700 dark:text-amber-300">{t('forecast.requirements')}</h4>
             <ul className="text-sm text-muted-foreground space-y-1">
-              <li>• Historical price data (JEPX)</li>
-              <li>• Solar radiation data (Open-Meteo)</li>
-              <li>• ML features built from raw data</li>
-              <li>• At least 30 days of data recommended</li>
+              <li>• {t('forecast.req_price_data')}</li>
+              <li>• {t('forecast.req_solar_data')}</li>
+              <li>• {t('forecast.req_ml_features')}</li>
+              <li>• {t('forecast.req_data_volume')}</li>
             </ul>
           </div>
 
           <p className="text-xs text-muted-foreground">
-            <strong>Note:</strong> Training typically takes 30-60 seconds depending on data volume.
-            The model uses XGBoost algorithm optimized for time-series price prediction.
+            {t('forecast.training_note')}
           </p>
         </div>
       </div>
@@ -111,7 +111,7 @@ print(response.json())`}
       <div className="rounded-lg border bg-card p-6">
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
           <div>
-            <label className="block text-sm font-medium mb-2">Area</label>
+            <label className="block text-sm font-medium mb-2">{t('common.area')}</label>
             <select
               className="w-full p-2 border rounded-md"
               value={selectedArea}
@@ -126,7 +126,7 @@ print(response.json())`}
           </div>
 
           <div>
-            <label className="block text-sm font-medium mb-2">Horizon</label>
+            <label className="block text-sm font-medium mb-2">{t('forecast.horizon')}</label>
             <select
               className="w-full p-2 border rounded-md"
               value={selectedHorizon}
@@ -146,7 +146,7 @@ print(response.json())`}
           onClick={generateForecast}
           disabled={loading}
         >
-          {loading ? 'Generating...' : 'Generate Forecast'}
+          {loading ? t('forecast.generating') : t('forecast.generate_button')}
         </button>
       </div>
 
@@ -159,12 +159,12 @@ print(response.json())`}
       {forecast && forecast.points.length > 0 && (
         <>
           <div className="rounded-lg border bg-card p-6">
-            <h2 className="text-xl font-semibold mb-4">Forecast Results</h2>
+            <h2 className="text-xl font-semibold mb-4">{t('forecast.results')}</h2>
             <MultiSeriesChart
-              title={`Price Forecast - ${forecast.area}`}
+              title={`${t('forecast.title')} - ${forecast.area}`}
               series={[
                 {
-                  name: 'Predicted Price',
+                  name: t('forecast.predicted_price'),
                   data: forecast.points.map((p) => ({
                     timestamp: p.timestamp,
                     value: p.price_pred,
@@ -172,19 +172,19 @@ print(response.json())`}
                   color: '#3b82f6',
                 },
               ]}
-              yAxisLabel="Price (JPY/kWh)"
+              yAxisLabel={t('chart.price_jpy_kwh')}
               height={450}
             />
           </div>
 
           <div className="rounded-lg border bg-card p-6">
-            <h3 className="font-semibold mb-4">Forecast Data</h3>
+            <h3 className="font-semibold mb-4">{t('forecast.forecast_data')}</h3>
             <div className="overflow-x-auto">
               <table className="w-full text-sm">
                 <thead>
                   <tr className="border-b">
-                    <th className="text-left p-2">Timestamp (JST)</th>
-                    <th className="text-right p-2">Predicted Price (JPY/kWh)</th>
+                    <th className="text-left p-2">{t('data.timestamp')}</th>
+                    <th className="text-right p-2">{t('forecast.predicted_price')} (JPY/kWh)</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -201,18 +201,17 @@ print(response.json())`}
             </div>
             {forecast.points.length > 24 && (
               <p className="text-sm text-muted-foreground mt-2">
-                Showing first 24 hours. Total: {forecast.points.length} hours.
+                {t('forecast.showing_hours', { total: forecast.points.length })}
               </p>
             )}
           </div>
 
           <div className="rounded-lg border bg-muted p-4">
             <p className="text-sm">
-              <strong>Model:</strong> {forecast.model_id}
+              <strong>{t('forecast.model')}:</strong> {forecast.model_id}
             </p>
             <p className="text-sm text-muted-foreground mt-2">
-              Forecast generated using XGBoost baseline model. Results are for
-              analysis purposes only.
+              {t('forecast.model_note')}
             </p>
           </div>
         </>

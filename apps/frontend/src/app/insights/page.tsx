@@ -2,6 +2,7 @@
 
 import { useState } from 'react'
 import { api, type HourlyPatternsResponse } from '@/lib/api'
+import { useI18n } from '@/lib/i18n'
 import ReactEChartsCore from 'echarts-for-react/lib/core'
 import * as echarts from 'echarts/core'
 import { BarChart, LineChart } from 'echarts/charts'
@@ -39,6 +40,7 @@ const PERIODS = [
 ]
 
 export default function InsightsPage() {
+  const { t } = useI18n()
   const [selectedArea, setSelectedArea] = useState('TOKYO')
   const [selectedPeriod, setSelectedPeriod] = useState('30')
   const [hourlyData, setHourlyData] = useState<HourlyPatternsResponse | null>(null)
@@ -78,7 +80,7 @@ export default function InsightsPage() {
 
     return {
       title: {
-        text: `${selectedArea}: Daily Price & Solar Pattern`,
+        text: `${selectedArea}: ${t('insights.chart_title')}`,
         subtext: `Average over ${selectedPeriod} days`,
         left: 'center',
       },
@@ -104,7 +106,7 @@ export default function InsightsPage() {
         }
       },
       legend: {
-        data: ['Price', 'Solar Radiation (GHI)'],
+        data: [t('overview.price'), t('overview.radiation')],
         top: 40,
       },
       grid: {
@@ -121,7 +123,7 @@ export default function InsightsPage() {
           axisPointer: {
             type: 'shadow'
           },
-          name: 'Hour of Day',
+          name: t('chart.hour_of_day'),
           nameLocation: 'middle',
           nameGap: 35,
         }
@@ -129,7 +131,7 @@ export default function InsightsPage() {
       yAxis: [
         {
           type: 'value',
-          name: 'Price (JPY/kWh)',
+          name: t('chart.price_jpy_kwh'),
           position: 'left',
           axisLabel: {
             formatter: '{value}'
@@ -137,7 +139,7 @@ export default function InsightsPage() {
         },
         {
           type: 'value',
-          name: 'Solar Radiation (W/m²)',
+          name: t('chart.solar_radiation'),
           position: 'right',
           axisLabel: {
             formatter: '{value}'
@@ -161,7 +163,7 @@ export default function InsightsPage() {
       ],
       series: [
         {
-          name: 'Price',
+          name: t('overview.price'),
           type: 'bar',
           data: prices,
           itemStyle: {
@@ -170,7 +172,7 @@ export default function InsightsPage() {
           yAxisIndex: 0,
         },
         {
-          name: 'Solar Radiation (GHI)',
+          name: t('overview.radiation'),
           type: 'line',
           smooth: true,
           data: ghiValues,

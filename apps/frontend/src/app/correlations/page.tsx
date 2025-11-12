@@ -2,6 +2,7 @@
 
 import { useState } from 'react'
 import { api, type CorrelationResult } from '@/lib/api'
+import { useI18n } from '@/lib/i18n'
 import { ScatterChart } from '@/components/charts'
 
 const AREAS = [
@@ -18,6 +19,7 @@ interface ScatterData {
 }
 
 export default function CorrelationsPage() {
+  const { t } = useI18n()
   const [selectedArea, setSelectedArea] = useState('TOKYO')
   const [selectedPeriod, setSelectedPeriod] = useState('30d')
   const [correlation, setCorrelation] = useState<CorrelationResult | null>(null)

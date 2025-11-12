@@ -2,6 +2,7 @@
 
 import { useState } from 'react'
 import { api, type PricePoint, type RadiationPoint } from '@/lib/api'
+import { useI18n } from '@/lib/i18n'
 import { formatDate, formatNumber } from '@/lib/utils'
 import { TimeSeriesChart, MultiSeriesChart } from '@/components/charts'
 
@@ -13,6 +14,7 @@ const AREAS = [
 type DataType = 'prices' | 'radiation'
 
 export default function DataPage() {
+  const { t } = useI18n()
   const [selectedArea, setSelectedArea] = useState('TOKYO')
   const [dataType, setDataType] = useState<DataType>('prices')
   const [prices, setPrices] = useState<PricePoint[]>([])
@@ -50,16 +52,16 @@ export default function DataPage() {
   return (
     <div className="space-y-6">
       <div>
-        <h1 className="text-3xl font-bold">Data Explorer</h1>
+        <h1 className="text-3xl font-bold">{t('data.title')}</h1>
         <p className="text-muted-foreground">
-          Browse and export raw price and radiation data
+          {t('data.subtitle')}
         </p>
       </div>
 
       <div className="rounded-lg border bg-card p-6">
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">
           <div>
-            <label className="block text-sm font-medium mb-2">Area</label>
+            <label className="block text-sm font-medium mb-2">{t('common.area')}</label>
             <select
               className="w-full p-2 border rounded-md"
               value={selectedArea}
@@ -74,14 +76,14 @@ export default function DataPage() {
           </div>
 
           <div>
-            <label className="block text-sm font-medium mb-2">Data Type</label>
+            <label className="block text-sm font-medium mb-2">{t('data.data_type')}</label>
             <select
               className="w-full p-2 border rounded-md"
               value={dataType}
               onChange={(e) => setDataType(e.target.value as DataType)}
             >
-              <option value="prices">Prices</option>
-              <option value="radiation">Radiation</option>
+              <option value="prices">{t('overview.price')}</option>
+              <option value="radiation">{t('overview.radiation')}</option>
             </select>
           </div>
 
@@ -91,14 +93,14 @@ export default function DataPage() {
               onClick={fetchData}
               disabled={loading}
             >
-              {loading ? 'Loading...' : 'Load Data'}
+              {loading ? t('common.loading') : t('data.load_data')}
             </button>
             <button
               className="px-4 py-2 border rounded-md hover:bg-accent disabled:opacity-50"
               onClick={exportData}
               disabled={loading}
             >
-              Export CSV
+              {t('data.export_csv')}
             </button>
           </div>
         </div>
@@ -115,31 +117,31 @@ export default function DataPage() {
           {/* Price Chart */}
           <div className="rounded-lg border bg-card p-6">
             <TimeSeriesChart
-              title={`Electricity Prices - ${selectedArea}`}
+              title={`${t('data.electricity_prices')} - ${selectedArea}`}
               data={prices.map((p) => ({
                 timestamp: p.timestamp,
                 value: p.price_jpy_kwh,
               }))}
-              yAxisLabel="Price (JPY/kWh)"
+              yAxisLabel={t('chart.price_jpy_kwh')}
               height={400}
             />
             <p className="text-sm text-muted-foreground mt-4 text-center">
-              Interactive chart: Zoom in/out, pan to explore price trends over time
+              {t('data.interactive_chart')}
             </p>
           </div>
 
           {/* Price Table */}
           <div className="rounded-lg border bg-card p-6">
             <h2 className="text-xl font-semibold mb-4">
-              Price Data - {selectedArea}
+              {t('data.price_data')} - {selectedArea}
             </h2>
             <div className="overflow-x-auto">
               <table className="w-full text-sm">
               <thead>
                 <tr className="border-b">
-                  <th className="text-left p-2">Timestamp (JST)</th>
-                  <th className="text-right p-2">Price (JPY/kWh)</th>
-                  <th className="text-right p-2">Volume (kWh)</th>
+                  <th className="text-left p-2">{t('data.timestamp')}</th>
+                  <th className="text-right p-2">{t('chart.price_jpy_kwh')}</th>
+                  <th className="text-right p-2">{t('data.volume')}</th>
                 </tr>
               </thead>
               <tbody>
@@ -161,7 +163,7 @@ export default function DataPage() {
           </div>
           {prices.length > 100 && (
             <p className="text-sm text-muted-foreground mt-4">
-              Showing first 100 of {prices.length} records. Export to view all.
+              {t('data.showing_records', { count: prices.length })}
             </p>
           )}
           </div>
@@ -173,10 +175,10 @@ export default function DataPage() {
           {/* Radiation Chart */}
           <div className="rounded-lg border bg-card p-6">
             <MultiSeriesChart
-              title={`Solar Radiation - ${selectedArea}`}
+              title={`${t('data.solar_radiation')} - ${selectedArea}`}
               series={[
                 {
-                  name: 'GHI (Global)',
+                  name: t('data.ghi_global'),
                   data: radiation.map((r) => ({
                     timestamp: r.timestamp,
                     value: r.ghi || 0,
@@ -184,7 +186,7 @@ export default function DataPage() {
                   color: '#f59e0b', // amber
                 },
                 {
-                  name: 'DNI (Direct)',
+                  name: t('data.dni_direct'),
                   data: radiation.map((r) => ({
                     timestamp: r.timestamp,
                     value: r.dni || 0,
@@ -192,7 +194,7 @@ export default function DataPage() {
                   color: '#ef4444', // red
                 },
                 {
-                  name: 'DHI (Diffuse)',
+                  name: t('data.dhi_diffuse'),
                   data: radiation.map((r) => ({
                     timestamp: r.timestamp,
                     value: r.dhi || 0,
@@ -200,25 +202,25 @@ export default function DataPage() {
                   color: '#3b82f6', // blue
                 },
               ]}
-              yAxisLabel="Radiation (W/m²)"
+              yAxisLabel={t('chart.solar_radiation')}
               height={400}
             />
             <p className="text-sm text-muted-foreground mt-4 text-center">
-              GHI = Total solar radiation | DNI = Direct sunlight | DHI = Scattered/cloud-filtered light
+              {t('data.radiation_explanation')}
             </p>
           </div>
 
           {/* Radiation Table */}
           <div className="rounded-lg border bg-card p-6">
             <h2 className="text-xl font-semibold mb-4">
-              Radiation Data - {selectedArea}
+              {t('data.radiation_data')} - {selectedArea}
             </h2>
             <div className="overflow-x-auto">
               <table className="w-full text-sm">
               <thead>
                 <tr className="border-b">
-                  <th className="text-left p-2">Timestamp (JST)</th>
-                  <th className="text-left p-2">Station</th>
+                  <th className="text-left p-2">{t('data.timestamp')}</th>
+                  <th className="text-left p-2">{t('data.station')}</th>
                   <th className="text-right p-2">GHI</th>
                   <th className="text-right p-2">DNI</th>
                   <th className="text-right p-2">DHI</th>
@@ -245,8 +247,7 @@ export default function DataPage() {
           </div>
           {radiation.length > 100 && (
             <p className="text-sm text-muted-foreground mt-4">
-              Showing first 100 of {radiation.length} records. Export to view
-              all.
+              {t('data.showing_records', { count: radiation.length })}
             </p>
           )}
           </div>

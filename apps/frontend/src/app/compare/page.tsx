@@ -2,6 +2,7 @@
 
 import { useState } from 'react'
 import { api, type MultiAreaComparisonResponse } from '@/lib/api'
+import { useI18n } from '@/lib/i18n'
 import ReactEChartsCore from 'echarts-for-react/lib/core'
 import * as echarts from 'echarts/core'
 import { BarChart } from 'echarts/charts'
@@ -36,6 +37,7 @@ const PERIODS = [
 ]
 
 export default function ComparePage() {
+  const { t } = useI18n()
   const [selectedAreas, setSelectedAreas] = useState<string[]>(['TOKYO', 'KANSAI', 'HOKKAIDO'])
   const [selectedPeriod, setSelectedPeriod] = useState('30')
   const [comparisonData, setComparisonData] = useState<MultiAreaComparisonResponse | null>(null)
@@ -88,7 +90,7 @@ export default function ComparePage() {
 
     return {
       title: {
-        text: 'Price Comparison Across Areas',
+        text: t('compare.price_comparison'),
         left: 'center',
       },
       tooltip: {
@@ -105,7 +107,7 @@ export default function ComparePage() {
         }
       },
       legend: {
-        data: ['Average', 'Minimum', 'Maximum'],
+        data: [t('compare.average'), t('compare.minimum'), t('compare.maximum')],
         top: 35,
       },
       grid: {
@@ -124,11 +126,11 @@ export default function ComparePage() {
       },
       yAxis: {
         type: 'value',
-        name: 'Price (JPY/kWh)',
+        name: t('chart.price_jpy_kwh'),
       },
       series: [
         {
-          name: 'Average',
+          name: t('compare.average'),
           type: 'bar',
           data: avgPrices,
           itemStyle: {
@@ -136,7 +138,7 @@ export default function ComparePage() {
           },
         },
         {
-          name: 'Minimum',
+          name: t('compare.minimum'),
           type: 'bar',
           data: minPrices,
           itemStyle: {
@@ -144,7 +146,7 @@ export default function ComparePage() {
           },
         },
         {
-          name: 'Maximum',
+          name: t('compare.maximum'),
           type: 'bar',
           data: maxPrices,
           itemStyle: {
@@ -164,7 +166,7 @@ export default function ComparePage() {
 
     return {
       title: {
-        text: 'Average Solar Radiation (GHI) Across Areas',
+        text: t('compare.solar_comparison'),
         left: 'center',
       },
       tooltip: {
@@ -192,11 +194,11 @@ export default function ComparePage() {
       },
       yAxis: {
         type: 'value',
-        name: 'Radiation (W/m²)',
+        name: t('chart.solar_radiation'),
       },
       series: [
         {
-          name: 'Avg GHI',
+          name: t('compare.avg_ghi'),
           type: 'bar',
           data: avgGhi,
           itemStyle: {
@@ -217,7 +219,7 @@ export default function ComparePage() {
 
     return {
       title: {
-        text: 'Price-Solar Correlation by Area',
+        text: t('compare.correlation_chart'),
         left: 'center',
       },
       tooltip: {
@@ -227,8 +229,8 @@ export default function ComparePage() {
         },
         formatter: (params: any) => {
           const value = params[0].value
-          const strength = Math.abs(value) > 0.5 ? 'Strong' : Math.abs(value) > 0.3 ? 'Moderate' : 'Weak'
-          return `<strong>${params[0].axisValue}</strong><br/>${params[0].marker} Correlation: ${value.toFixed(3)}<br/>Strength: ${strength}`
+          const strength = Math.abs(value) > 0.5 ? t('correlations.strong') : Math.abs(value) > 0.3 ? t('correlations.moderate') : t('correlations.weak')
+          return `<strong>${params[0].axisValue}</strong><br/>${params[0].marker} ${t('overview.correlation')}: ${value.toFixed(3)}<br/>${t('correlations.strength')}: ${strength}`
         }
       },
       grid: {
@@ -247,13 +249,13 @@ export default function ComparePage() {
       },
       yAxis: {
         type: 'value',
-        name: 'Correlation Coefficient',
+        name: t('correlations.coefficient'),
         min: -1,
         max: 1,
       },
       series: [
         {
-          name: 'Correlation',
+          name: t('overview.correlation'),
           type: 'bar',
           data: correlations,
           itemStyle: {
@@ -302,15 +304,15 @@ export default function ComparePage() {
   return (
     <div className="space-y-6">
       <div>
-        <h1 className="text-3xl font-bold">Multi-Area Comparison</h1>
+        <h1 className="text-3xl font-bold">{t('compare.title')}</h1>
         <p className="text-muted-foreground">
-          Compare electricity prices and solar radiation across Japanese power areas
+          {t('compare.subtitle')}
         </p>
       </div>
 
       {/* Area Selection */}
       <div className="rounded-lg border bg-card p-6">
-        <h2 className="text-lg font-semibold mb-4">Select Areas to Compare</h2>
+        <h2 className="text-lg font-semibold mb-4">{t('compare.select_areas')}</h2>
         <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-3 mb-4">
           {ALL_AREAS.map((area) => (
             <label
@@ -334,7 +336,7 @@ export default function ComparePage() {
 
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
           <div>
-            <label className="block text-sm font-medium mb-2">Time Period</label>
+            <label className="block text-sm font-medium mb-2">{t('compare.time_period')}</label>
             <select
               className="w-full p-2 border rounded-md"
               value={selectedPeriod}
@@ -354,13 +356,13 @@ export default function ComparePage() {
               onClick={fetchComparison}
               disabled={loading || selectedAreas.length === 0}
             >
-              {loading ? 'Loading...' : `Compare ${selectedAreas.length} Area${selectedAreas.length !== 1 ? 's' : ''}`}
+              {loading ? t('common.loading') : `${t('compare.compare_button')} ${selectedAreas.length} ${selectedAreas.length !== 1 ? t('compare.areas') : t('common.area')}`}
             </button>
           </div>
         </div>
 
         {selectedAreas.length === 0 && (
-          <p className="text-sm text-amber-600">Please select at least one area</p>
+          <p className="text-sm text-amber-600">{t('compare.select_at_least_one')}</p>
         )}
       </div>
 
@@ -374,26 +376,26 @@ export default function ComparePage() {
       {insights && (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
           <div className="rounded-lg border bg-card p-6">
-            <h3 className="text-xs font-medium text-muted-foreground mb-2 uppercase tracking-wide">Lowest Avg Price</h3>
+            <h3 className="text-xs font-medium text-muted-foreground mb-2 uppercase tracking-wide">{t('compare.lowest_price')}</h3>
             <div className="text-2xl font-bold text-green-600">{insights.lowestPrice.area}</div>
             <div className="text-lg">{insights.lowestPrice.avg_price.toFixed(2)} JPY/kWh</div>
           </div>
 
           <div className="rounded-lg border bg-card p-6">
-            <h3 className="text-xs font-medium text-muted-foreground mb-2 uppercase tracking-wide">Highest Avg Price</h3>
+            <h3 className="text-xs font-medium text-muted-foreground mb-2 uppercase tracking-wide">{t('compare.highest_price')}</h3>
             <div className="text-2xl font-bold text-red-600">{insights.highestPrice.area}</div>
             <div className="text-lg">{insights.highestPrice.avg_price.toFixed(2)} JPY/kWh</div>
           </div>
 
           <div className="rounded-lg border bg-card p-6">
-            <h3 className="text-xs font-medium text-muted-foreground mb-2 uppercase tracking-wide">Highest Solar</h3>
+            <h3 className="text-xs font-medium text-muted-foreground mb-2 uppercase tracking-wide">{t('compare.highest_solar')}</h3>
             <div className="text-2xl font-bold text-amber-600">{insights.highestSolar.area}</div>
             <div className="text-lg">{insights.highestSolar.avg_ghi.toFixed(1)} W/m²</div>
           </div>
 
           {insights.strongestCorr && (
             <div className="rounded-lg border bg-card p-6">
-              <h3 className="text-xs font-medium text-muted-foreground mb-2 uppercase tracking-wide">Strongest Correlation</h3>
+              <h3 className="text-xs font-medium text-muted-foreground mb-2 uppercase tracking-wide">{t('compare.strongest_correlation')}</h3>
               <div className="text-2xl font-bold text-blue-600">{insights.strongestCorr.area}</div>
               <div className="text-lg">{insights.strongestCorr.correlation?.toFixed(3)}</div>
             </div>
@@ -414,7 +416,7 @@ export default function ComparePage() {
               lazyUpdate={true}
             />
             <p className="text-sm text-muted-foreground mt-4 text-center">
-              Compare average, minimum, and maximum electricity prices across selected areas
+              {t('compare.price_chart_desc')}
             </p>
           </div>
 
@@ -428,7 +430,7 @@ export default function ComparePage() {
               lazyUpdate={true}
             />
             <p className="text-sm text-muted-foreground mt-4 text-center">
-              Average solar radiation (GHI) shows geographical and weather pattern differences
+              {t('compare.solar_chart_desc')}
             </p>
           </div>
 
@@ -442,24 +444,24 @@ export default function ComparePage() {
               lazyUpdate={true}
             />
             <p className="text-sm text-muted-foreground mt-4 text-center">
-              Negative correlation indicates solar generation reduces prices; positive indicates opposite effect
+              {t('compare.correlation_chart_desc')}
             </p>
           </div>
 
           {/* Detailed Table */}
           <div className="rounded-lg border bg-card p-6">
-            <h2 className="text-xl font-semibold mb-4">Detailed Statistics</h2>
+            <h2 className="text-xl font-semibold mb-4">{t('compare.detailed_stats')}</h2>
             <div className="overflow-x-auto">
               <table className="w-full text-sm">
                 <thead>
                   <tr className="border-b">
-                    <th className="text-left p-2">Area</th>
-                    <th className="text-right p-2">Avg Price</th>
-                    <th className="text-right p-2">Min Price</th>
-                    <th className="text-right p-2">Max Price</th>
-                    <th className="text-right p-2">Avg Solar</th>
-                    <th className="text-right p-2">Correlation</th>
-                    <th className="text-right p-2">Data Points</th>
+                    <th className="text-left p-2">{t('common.area')}</th>
+                    <th className="text-right p-2">{t('compare.avg_price')}</th>
+                    <th className="text-right p-2">{t('compare.min_price')}</th>
+                    <th className="text-right p-2">{t('compare.max_price')}</th>
+                    <th className="text-right p-2">{t('compare.avg_solar')}</th>
+                    <th className="text-right p-2">{t('overview.correlation')}</th>
+                    <th className="text-right p-2">{t('compare.data_points')}</th>
                   </tr>
                 </thead>
                 <tbody>
