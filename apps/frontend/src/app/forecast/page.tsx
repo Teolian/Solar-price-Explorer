@@ -46,6 +46,18 @@ export default function ForecastPage() {
         </p>
       </div>
 
+      {/* Info Alert */}
+      <div className="rounded-lg border border-blue-200 bg-blue-50 dark:bg-blue-950 p-4">
+        <h3 className="text-sm font-medium mb-2 uppercase tracking-wide text-blue-700 dark:text-blue-300">Model Training Required</h3>
+        <p className="text-sm text-muted-foreground mb-2">
+          Before generating forecasts, you need to train an ML model using historical data.
+        </p>
+        <p className="text-xs text-muted-foreground">
+          <strong>How to train:</strong> Use the API endpoint <code className="bg-white dark:bg-slate-800 px-1 py-0.5 rounded">/api/train</code> with your area and features.
+          Models are trained using XGBoost on historical price and solar radiation data.
+        </p>
+      </div>
+
       <div className="rounded-lg border bg-card p-6">
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
           <div>

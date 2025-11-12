@@ -61,7 +61,7 @@ export default function CorrelationsPage() {
           if (hour >= 6 && hour <= 18) {
             mergedData.push({
               timestamp: pricePoint.timestamp,
-              price: pricePoint.price,
+              price: pricePoint.price_jpy_kwh,
               ghi: radPoint.ghi || 0,
               dni: radPoint.dni || 0,
               dhi: radPoint.dhi || 0,
