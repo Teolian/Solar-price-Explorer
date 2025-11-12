@@ -296,7 +296,7 @@ export default function InsightsPage() {
             lazyUpdate={true}
           />
           <div className="mt-4 p-4 bg-blue-50 dark:bg-blue-950 rounded-lg text-sm">
-            <p className="font-medium mb-2">📊 How to Read This Chart:</p>
+            <p className="font-medium mb-2 uppercase text-xs tracking-wide text-blue-700 dark:text-blue-300">Chart Guide</p>
             <ul className="space-y-1">
               <li>• <span className="font-medium text-blue-600">Blue bars</span> = Average electricity price by hour</li>
               <li>• <span className="font-medium text-amber-600">Orange line</span> = Average solar radiation by hour</li>
@@ -359,7 +359,7 @@ export default function InsightsPage() {
               <div className="space-y-4">
                 <div className="p-4 bg-amber-50 dark:bg-amber-950 rounded-lg">
                   <div className="flex items-start justify-between mb-2">
-                    <h4 className="font-medium">☀️ Peak Solar Hour</h4>
+                    <h4 className="font-medium uppercase text-xs tracking-wide text-amber-700 dark:text-amber-300">Peak Solar Hour</h4>
                     <span className="text-2xl font-bold text-amber-600">
                       {insights.peakSolarHour.hour}:00
                     </span>
@@ -378,7 +378,7 @@ export default function InsightsPage() {
 
                 <div className="p-4 bg-green-50 dark:bg-green-950 rounded-lg">
                   <div className="flex items-start justify-between mb-2">
-                    <h4 className="font-medium">💰 Lowest Price Hour</h4>
+                    <h4 className="font-medium uppercase text-xs tracking-wide text-green-700 dark:text-green-300">Lowest Price Hour</h4>
                     <span className="text-2xl font-bold text-green-600">
                       {insights.lowestPriceHour.hour}:00
                     </span>
@@ -399,7 +399,7 @@ export default function InsightsPage() {
               <div className="space-y-4">
                 <div className="p-4 bg-slate-50 dark:bg-slate-950 rounded-lg">
                   <div className="flex items-start justify-between mb-2">
-                    <h4 className="font-medium">🌙 Midnight Hour</h4>
+                    <h4 className="font-medium uppercase text-xs tracking-wide text-slate-700 dark:text-slate-300">Midnight Hour</h4>
                     <span className="text-2xl font-bold text-slate-600">
                       {insights.midnightHour.hour}:00
                     </span>
@@ -418,7 +418,7 @@ export default function InsightsPage() {
 
                 <div className="p-4 bg-red-50 dark:bg-red-950 rounded-lg">
                   <div className="flex items-start justify-between mb-2">
-                    <h4 className="font-medium">📈 Highest Price Hour</h4>
+                    <h4 className="font-medium uppercase text-xs tracking-wide text-red-700 dark:text-red-300">Highest Price Hour</h4>
                     <span className="text-2xl font-bold text-red-600">
                       {insights.highestPriceHour.hour}:00
                     </span>
@@ -469,7 +469,7 @@ export default function InsightsPage() {
 
           {/* Interpretation Guide */}
           <div className="rounded-lg border bg-gradient-to-r from-blue-50 to-indigo-50 dark:from-blue-950 dark:to-indigo-950 p-6">
-            <h3 className="text-lg font-semibold mb-3">💡 Understanding the Pattern</h3>
+            <h3 className="text-lg font-semibold mb-3 uppercase text-sm tracking-wide">Understanding the Pattern</h3>
             <div className="space-y-2 text-sm">
               <p>
                 <strong>The Solar Effect:</strong> This analysis reveals how solar power generation influences

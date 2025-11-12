@@ -269,7 +269,7 @@ export default function CorrelationsPage() {
           </div>
 
           <div className="mt-4 p-4 bg-blue-50 dark:bg-blue-950 rounded-lg text-sm">
-            <p className="font-medium mb-2">💡 What This Shows:</p>
+            <p className="font-medium mb-2 uppercase text-xs tracking-wide text-blue-700 dark:text-blue-300">Chart Guide</p>
             <ul className="space-y-1 text-sm">
               <li>• Each point represents one hour of data (daytime hours only: 6am-6pm)</li>
               <li>• The red dashed line shows the trend (regression line)</li>

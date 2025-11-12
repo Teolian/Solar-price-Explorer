@@ -374,26 +374,26 @@ export default function ComparePage() {
       {insights && (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
           <div className="rounded-lg border bg-card p-6">
-            <h3 className="text-sm font-medium text-muted-foreground mb-2">💰 Lowest Avg Price</h3>
+            <h3 className="text-xs font-medium text-muted-foreground mb-2 uppercase tracking-wide">Lowest Avg Price</h3>
             <div className="text-2xl font-bold text-green-600">{insights.lowestPrice.area}</div>
             <div className="text-lg">{insights.lowestPrice.avg_price.toFixed(2)} JPY/kWh</div>
           </div>
 
           <div className="rounded-lg border bg-card p-6">
-            <h3 className="text-sm font-medium text-muted-foreground mb-2">📈 Highest Avg Price</h3>
+            <h3 className="text-xs font-medium text-muted-foreground mb-2 uppercase tracking-wide">Highest Avg Price</h3>
             <div className="text-2xl font-bold text-red-600">{insights.highestPrice.area}</div>
             <div className="text-lg">{insights.highestPrice.avg_price.toFixed(2)} JPY/kWh</div>
           </div>
 
           <div className="rounded-lg border bg-card p-6">
-            <h3 className="text-sm font-medium text-muted-foreground mb-2">☀️ Highest Solar</h3>
+            <h3 className="text-xs font-medium text-muted-foreground mb-2 uppercase tracking-wide">Highest Solar</h3>
             <div className="text-2xl font-bold text-amber-600">{insights.highestSolar.area}</div>
             <div className="text-lg">{insights.highestSolar.avg_ghi.toFixed(1)} W/m²</div>
           </div>
 
           {insights.strongestCorr && (
             <div className="rounded-lg border bg-card p-6">
-              <h3 className="text-sm font-medium text-muted-foreground mb-2">🔗 Strongest Correlation</h3>
+              <h3 className="text-xs font-medium text-muted-foreground mb-2 uppercase tracking-wide">Strongest Correlation</h3>
               <div className="text-2xl font-bold text-blue-600">{insights.strongestCorr.area}</div>
               <div className="text-lg">{insights.strongestCorr.correlation?.toFixed(3)}</div>
             </div>
@@ -495,7 +495,7 @@ export default function ComparePage() {
 
           {/* Regional Insights */}
           <div className="rounded-lg border bg-gradient-to-r from-blue-50 to-indigo-50 dark:from-blue-950 dark:to-indigo-950 p-6">
-            <h3 className="text-lg font-semibold mb-3">📍 Regional Patterns</h3>
+            <h3 className="text-lg font-semibold mb-3 uppercase text-sm tracking-wide">Regional Patterns</h3>
             <div className="space-y-2 text-sm">
               <p>
                 <strong>Price Variation:</strong> Different areas show varying price levels due to generation mix,

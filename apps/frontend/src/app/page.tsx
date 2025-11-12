@@ -248,21 +248,21 @@ export default function Home() {
       {/* Quick Actions */}
       <section className="grid grid-cols-1 md:grid-cols-3 gap-4">
         <Link href="/correlations" className="rounded-lg border bg-card p-6 hover:bg-accent transition-colors">
-          <h3 className="font-semibold mb-2">📊 Correlation Analysis</h3>
+          <h3 className="font-semibold mb-2 uppercase text-xs tracking-wide text-primary">Correlation Analysis</h3>
           <p className="text-sm text-muted-foreground">
             Analyze how solar radiation affects electricity prices across regions
           </p>
         </Link>
 
         <Link href="/forecast" className="rounded-lg border bg-card p-6 hover:bg-accent transition-colors">
-          <h3 className="font-semibold mb-2">🔮 Price Forecast</h3>
+          <h3 className="font-semibold mb-2 uppercase text-xs tracking-wide text-primary">Price Forecast</h3>
           <p className="text-sm text-muted-foreground">
             ML-powered predictions for future electricity spot prices
           </p>
         </Link>
 
         <Link href="/data" className="rounded-lg border bg-card p-6 hover:bg-accent transition-colors">
-          <h3 className="font-semibold mb-2">📈 Data Explorer</h3>
+          <h3 className="font-semibold mb-2 uppercase text-xs tracking-wide text-primary">Data Explorer</h3>
           <p className="text-sm text-muted-foreground">
             Browse and export raw price and solar radiation datasets
           </p>
@@ -274,14 +274,14 @@ export default function Home() {
         <h2 className="text-xl font-semibold mb-4">Key Insights</h2>
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           <div className="p-4 bg-blue-50 dark:bg-blue-950 rounded-lg">
-            <h3 className="font-medium mb-2">☀️ Solar Impact</h3>
+            <h3 className="font-medium mb-2 uppercase text-xs tracking-wide text-blue-700 dark:text-blue-300">Solar Impact</h3>
             <p className="text-sm text-muted-foreground">
               When solar radiation increases during daytime hours (6am-6pm), electricity spot prices
               typically decrease as solar generation reduces demand from conventional sources.
             </p>
           </div>
           <div className="p-4 bg-green-50 dark:bg-green-950 rounded-lg">
-            <h3 className="font-medium mb-2">📍 Regional Variations</h3>
+            <h3 className="font-medium mb-2 uppercase text-xs tracking-wide text-green-700 dark:text-green-300">Regional Variations</h3>
             <p className="text-sm text-muted-foreground">
               Tokyo shows the strongest price-solar correlation due to high solar capacity. Hokkaido
               experiences more price volatility due to grid isolation and weather patterns.
