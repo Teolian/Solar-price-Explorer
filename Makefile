@@ -26,9 +26,13 @@ help:
 	@echo "make import-jepx-csv - Import manually downloaded JEPX CSV"
 	@echo "make fetch-radiation - Fetch solar radiation from Open-Meteo"
 	@echo ""
-	@echo "=== Testing ==="
+	@echo "=== Testing & Debugging ==="
 	@echo "make test           - Run all tests"
 	@echo "make lint           - Run linters"
+	@echo "make test-download-single-day    - Quick test: download single day data"
+	@echo "make analyze-jepx-csv            - Analyze JEPX CSV structure and availability"
+	@echo "make debug-jepx-structure        - Debug JEPX column matching issues"
+	@echo "make test-jepx-normalization     - Test normalization logic with debug output"
 	@echo ""
 	@echo "NOTE: Direct HTTP fetching (fetch-real-data) returns 403 errors."
 	@echo "      Use Playwright automation instead!"
@@ -325,4 +329,37 @@ test-download-single-day:
 	docker-compose exec -T api python /etl/test_download_single_day.py --area TOKYO
 	@echo ""
 	@echo "Check results above - at least TEPCO and Open-Meteo should succeed"
+	@echo "========================================"
+
+# Debug JEPX import issues
+debug-jepx-structure:
+	@echo "========================================"
+	@echo "DEBUG: JEPX CSV Structure Analysis"
+	@echo "========================================"
+	@echo "Analyzing column names and data format"
+	@echo ""
+	docker-compose exec -T api python /etl/debug_jepx_import.py
+	@echo ""
+	@echo "This shows actual CSV structure and column matching test"
+	@echo "========================================"
+
+test-jepx-normalization:
+	@echo "========================================"
+	@echo "TEST: JEPX Normalization Logic"
+	@echo "========================================"
+	@echo "Testing data normalization with detailed debug output"
+	@echo ""
+	docker-compose exec -T api python /etl/test_jepx_normalization.py
+	@echo ""
+	@echo "This shows why normalization succeeds or fails"
+	@echo "========================================"
+
+analyze-jepx-csv:
+	@echo "========================================"
+	@echo "ANALYZE: JEPX CSV Data Availability"
+	@echo "========================================"
+	@echo "Checking what data is available in downloaded CSV"
+	@echo ""
+	docker-compose exec -T api python /etl/analyze_jepx_csv.py /app/data/jepx/spot_2025.csv
+	@echo ""
 	@echo "========================================"

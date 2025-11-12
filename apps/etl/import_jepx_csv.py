@@ -126,19 +126,31 @@ def normalize_data(raw_df: pd.DataFrame, areas_filter: Optional[List[str]] = Non
             if areas_filter and en_name not in areas_filter:
                 continue
 
-            if jp_name in raw_df.columns:
-                area_price = row[jp_name]
+            # Find column that contains the area name
+            # Columns are like: エリアプライス北海道(円/kWh)
+            # We search for columns containing the area name (北海道, 東京, etc.)
+            area_col = None
+            for col in raw_df.columns:
+                if jp_name in col and 'エリアプライス' in col:
+                    area_col = col
+                    break
 
-                # Skip if price is null
-                if pd.isna(area_price):
+            if area_col and area_col in row:
+                area_price = row[area_col]
+
+                # Skip if price is null or empty
+                if pd.isna(area_price) or area_price == '':
                     continue
 
-                normalized_records.append({
-                    'timestamp': timestamp,
-                    'area': en_name,
-                    'area_price_jpy_kwh': float(area_price),
-                    'system_price_jpy_kwh': float(system_price) if pd.notna(system_price) else None
-                })
+                try:
+                    normalized_records.append({
+                        'timestamp': timestamp,
+                        'area': en_name,
+                        'area_price_jpy_kwh': float(area_price),
+                        'system_price_jpy_kwh': float(system_price) if pd.notna(system_price) else None
+                    })
+                except (ValueError, TypeError) as e:
+                    logger.debug(f"Could not convert price for {en_name} at {timestamp}: {area_price}")
 
     if not normalized_records:
         logger.error("No valid records after normalization!")
